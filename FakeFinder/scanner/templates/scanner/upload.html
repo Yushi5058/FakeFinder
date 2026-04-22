@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <title>FakeFinder - Upload</title>
+  </head>
+  <body>
+    <h1>Upload an Email for Scanning</h1>
+
+    <form method="POST" enctype="multipart/form-data">
+      {% csrf_token %}
+      <label for="email_file">Select an .eml file:</label>
+      <br /><br />
+      <input type="file" name="eml_file" accept=".eml" required />
+      <br /><br />
+      <button type="submit">Scan File</button>
+    </form>
+  </body>
+</html>
