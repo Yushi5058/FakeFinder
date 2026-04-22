@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <title>FakeFinder - Report</title>
+  </head>
+  <body>
+    <h1>Analysis Complete (Report #{{ report.id }})</h1>
+
+    <h2>Risk Score: {{ report.risk_score }}</h2>
+
+    <h3>Extracted Data:</h3>
+    <ul>
+      <li>
+        <strong>Sender Domain:</strong> {{ report.header_anomalies.sender_domain
+        }}
+      </li>
+    </ul>
+
+    <h3>Suspicious URLs Found:</h3>
+    <ul>
+      {% for url in report.suspicious_urls %}
+      <li>{{ url }}</li>
+      {% empty %}
+      <li>No URLs found in this email.</li>
+      {% endfor %}
+    </ul>
+
+    <br />
+    <a href="/">Scan Another Email</a>
+  </body>
+</html>
