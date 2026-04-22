@@ -25,13 +25,14 @@ def upload_email(request):
         parsed_data = parse_eml_in_memory(eml_file)
         # TODO : Machine learning goes here later
         report = ScanReport.objects.create(
-            risk_score=50,
+            user=request.user if request.user.is_authenticated else None,
+            risk_score="MEDIUM",
             suspicious_urls=parsed_data["urls"],
-            header_anomalies={"sender_domain": parsed_data["sender_domain"]},
+            header_anomalies=[{"sender_domain": parsed_data["sender_domain"]}],
         )
         return redirect("report_detail", report_id=report.id)
 
-    return render(request, "fakefinder/upload.html")
+    return render(request, "scanner/upload.html")
 
 
 def report_detail(request, report_id):
@@ -41,4 +42,4 @@ def report_detail(request, report_id):
     report = get_object_or_404(ScanReport, id=report_id)
 
     # The template 'fakefinder/report.html' will handle the visual alert formatting (Green/Orange/Red).
-    return render(request, "fakefinder/report.html", {"report": report})
+    return render(request, "scanner/report.html", {"report": report})
