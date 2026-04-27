@@ -1,6 +1,9 @@
+import time
+
 from django.shortcuts import redirect, render, get_object_or_404
 
 from .utils import parse_eml_in_memory
+import mimetypes
 from .models import ScanReport
 from django.http import HttpResponseBadRequest
 # Placeholder for Scikit-learn model integration
@@ -20,16 +23,26 @@ def upload_email(request):
     if request.method == "POST":
         eml_file = request.FILES.get("eml_file")
 
-        if not eml_file or not eml_file.name.endswith(".eml"):
+        if (
+            not eml_file
+            or not eml_file.name.lower().endswith(".eml")
+            or mimetypes.guess_type(eml_file) != "message/rfc822"
+        ):
             return HttpResponseBadRequest("Please upload a valid .eml file")
-        parsed_data = parse_eml_in_memory(eml_file)
-        # TODO : Machine learning goes here later
+        pipeline_start = time.perf_counter()
+        try:
+            parsed_data = parse_eml_in_memory(eml_file)
+        except ValueError as e:
+            return HttpResponseBadRequest(str(e))
+        # ml_score = ml_model.predict(...)  # TODO: ML integration
         report = ScanReport.objects.create(
             user=request.user if request.user.is_authenticated else None,
             risk_score="MEDIUM",
             suspicious_urls=parsed_data["urls"],
             header_anomalies=[{"sender_domain": parsed_data["sender_domain"]}],
         )
+        total_elapsed = time.perf_counter() - pipeline_start
+        print(f"[Benchmark] Parse+Save+Redirect (excl. ML): {total_elapsed:.3f}s")
         return redirect("report_detail", report_id=report.id)
 
     return render(request, "scanner/upload.html")
