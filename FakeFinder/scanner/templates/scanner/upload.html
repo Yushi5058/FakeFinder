@@ -1,18 +1,850 @@
-<!doctype html>
-<html>
-  <head>
-    <title>FakeFinder - Upload</title>
-  </head>
-  <body>
-    <h1>Upload an Email for Scanning</h1>
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fake Finder – Détecteur de phishing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink:  { 950:'#070b1a', 900:'#0b1126', 800:'#111a36', 700:'#1a2547', 600:'#243160' },
+            brand:   { 400:'#7aa2ff', 500:'#4f7cff', 600:'#3a5fe0' },
+            verdict: { safe:'#22c55e', warn:'#f59e0b', danger:'#ef4444' },
+          },
+          fontFamily: {
+            sans: ['Inter','system-ui','sans-serif'],
+            mono: ['JetBrains Mono','ui-monospace','monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background-color: #070b1a;
+      background-image:
+        radial-gradient(ellipse at 18% -8%,  rgba(79,124,255,.20), transparent 52%),
+        radial-gradient(ellipse at 82% 108%, rgba(36,49,96,.38),   transparent 52%);
+      background-attachment: fixed;
+    }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(122,162,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(122,162,255,.045) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .gradient-text {
+      background: linear-gradient(125deg, #7aa2ff 0%, #4f7cff 45%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .fade-in { animation: fadeUp .28s ease forwards; }
+    @keyframes softPulse {
+      0%,100% { opacity:.45; transform:scale(1);    }
+      50%      { opacity:0;   transform:scale(1.18); }
+    }
+    .anim-ring { animation: softPulse 2.8s ease-in-out infinite; }
+    ::-webkit-scrollbar       { width:5px; }
+    ::-webkit-scrollbar-track { background:#070b1a; }
+    ::-webkit-scrollbar-thumb { background:#1a2547; border-radius:4px; }
 
-    <form method="POST" enctype="multipart/form-data">
-      {% csrf_token %}
-      <label for="email_file">Select an .eml file:</label>
-      <br /><br />
-      <input type="file" name="eml_file" accept=".eml" required />
-      <br /><br />
-      <button type="submit">Scan File</button>
-    </form>
-  </body>
+    /* Badge helpers (no @apply needed) */
+    .badge { display:inline-flex; align-items:center; gap:5px; border-radius:9999px; padding:2px 9px; font-size:11px; font-weight:700; letter-spacing:.03em; }
+    .badge-safe   { background:rgba(34,197,94,.15);  color:#22c55e; }
+    .badge-warn   { background:rgba(245,158,11,.15); color:#f59e0b; }
+    .badge-danger { background:rgba(239,68,68,.15);  color:#ef4444; }
+
+    /* Nav active state */
+    .nav-btn       { color:rgb(148,163,184); transition:color .15s, background .15s; }
+    .nav-btn:hover { color:#fff; background:rgba(255,255,255,.06); }
+    .nav-btn.active { color:#fff; }
+
+    /* Drop-zone drag-over */
+    .drop-active { border-color:rgba(79,124,255,.55) !important; background-color:rgba(79,124,255,.07) !important; }
+  </style>
+</head>
+
+<body class="font-sans text-slate-100 antialiased min-h-screen flex flex-col">
+
+<!-- ════════════════════ HEADER ════════════════════ -->
+<header class="sticky top-0 z-50 border-b border-white/5 bg-[#070b1a]/88 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+
+    <!-- Logo -->
+    <button onclick="goTo('home')" class="flex items-center gap-2.5 group focus:outline-none">
+      <div class="relative">
+        <div class="absolute inset-0 rounded-xl bg-brand-500/25 anim-ring"></div>
+        <span class="relative flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/30">
+          <svg class="h-5 w-5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </span>
+      </div>
+      <div class="leading-none text-left">
+        <div class="text-[13px] font-bold tracking-tight">Fake Finder</div>
+        <div class="text-[9px] uppercase tracking-[.26em] text-slate-500">phishing detector</div>
+      </div>
+    </button>
+
+    <!-- Nav -->
+    <nav class="hidden md:flex items-center gap-0.5">
+      <button data-nav="home"    onclick="goTo('home')"    class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Analyser</button>
+      <button data-nav="history" onclick="goTo('history')" id="nav-history" class="nav-btn rounded-lg px-3.5 py-2 text-[13px] hidden">Historique</button>
+      <button data-nav="admin"   onclick="goTo('admin')"   id="nav-admin"   class="nav-btn rounded-lg px-3.5 py-2 text-[13px] hidden">Admin</button>
+    </nav>
+
+    <!-- Auth -->
+    <div class="flex items-center gap-1.5">
+      <!-- logged-out -->
+      <div id="auth-out" class="flex items-center gap-1.5">
+        <button onclick="goTo('login')"    class="rounded-lg px-3.5 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Connexion</button>
+        <button onclick="goTo('register')" class="rounded-lg bg-brand-500 px-3.5 py-2 text-[13px] font-semibold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600 transition-colors">Inscription</button>
+      </div>
+      <!-- logged-in -->
+      <div id="auth-in" class="hidden items-center gap-2">
+        <span class="hidden md:inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-[12px] text-slate-300">
+          <span class="h-1.5 w-1.5 rounded-full bg-verdict-safe animate-pulse"></span>
+          <span id="logged-name">utilisateur</span>
+        </span>
+        <button onclick="demoLogout()" class="rounded-lg px-3 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Déconnexion</button>
+      </div>
+    </div>
+
+  </div>
+</header>
+
+<!-- ════════════════════ MAIN ════════════════════ -->
+<main class="flex-1 mx-auto w-full max-w-6xl px-6">
+
+  <!-- ══ HOME ══ -->
+  <section id="home" data-section class="py-14 space-y-14">
+
+    <!-- Hero -->
+    <div class="text-center space-y-5">
+      <!-- Shield icon -->
+      <div class="mx-auto relative inline-flex items-center justify-center">
+        <div class="absolute h-32 w-32 rounded-full bg-brand-500/18 blur-2xl"></div>
+        <div class="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/25 to-brand-600/10 ring-1 ring-brand-500/30 shadow-xl shadow-brand-500/10">
+          <svg class="h-10 w-10 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Badge -->
+      <span class="inline-flex items-center gap-2 rounded-full border border-brand-500/25 bg-brand-500/10 px-4 py-1.5 text-xs font-semibold text-brand-400">
+        <span class="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse"></span>
+        Analyse heuristique + IA
+      </span>
+
+      <!-- Headline -->
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight leading-[1.15]">
+        Détectez les emails frauduleux<br>
+        <span class="gradient-text">en quelques secondes</span>
+      </h1>
+      <p class="mx-auto max-w-lg text-[15px] text-slate-400 leading-relaxed">
+        Importez un fichier <code class="font-mono text-slate-200 bg-white/5 px-1.5 py-0.5 rounded text-[13px]">.eml</code>,
+        Fake Finder analyse les en-têtes, les liens et le contenu pour vous donner un verdict clair avec code couleur.
+      </p>
+    </div>
+
+    <!-- Upload card -->
+    <div class="mx-auto max-w-2xl space-y-4">
+      <form id="upload-form" method="POST" action="/" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- Drop zone -->
+        <div id="drop-zone"
+             class="rounded-2xl border-2 border-dashed border-white/15 bg-ink-900/60 p-10 text-center cursor-pointer transition-all duration-200 hover:border-brand-500/35 hover:bg-brand-500/5 grid-bg select-none">
+
+          <!-- Upload icon -->
+          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/25">
+            <svg id="dz-icon" class="h-7 w-7 text-brand-400 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+
+          <p class="mt-5 text-[15px] font-semibold">Déposez votre fichier <code class="font-mono text-brand-400">.eml</code></p>
+          <p class="mt-1 text-sm text-slate-500">ou cliquez pour parcourir vos fichiers</p>
+
+          <!-- Hidden input -->
+          <input id="eml-input" type="file" name="eml_file" accept=".eml" class="hidden">
+
+          <!-- File selected preview -->
+          <div id="file-preview" class="hidden mt-5 inline-flex items-center gap-2.5 rounded-xl border border-brand-500/25 bg-brand-500/10 px-4 py-2.5">
+            <svg class="h-4 w-4 text-brand-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="file-name" class="text-sm font-medium text-slate-200 max-w-[200px] truncate"></span>
+            <span id="file-size" class="text-xs text-slate-500"></span>
+            <button type="button" id="clear-btn" class="ml-1 text-slate-500 hover:text-slate-300 shrink-0">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <p class="mt-4 text-xs text-slate-600">Taille max&nbsp;: 10 Mo · Format&nbsp;: .eml uniquement</p>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex gap-3">
+          <button id="submit-btn" type="submit" disabled
+                  class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
+            <span id="submit-text">Analyser l'email</span>
+          </button>
+        </div>
+
+        <p id="upload-error" class="hidden text-center text-xs text-verdict-danger"></p>
+
+        <p class="text-center text-xs text-slate-600">
+          Aucune connexion requise.
+          <button type="button" onclick="goTo('login')" class="text-slate-500 hover:text-slate-400 underline underline-offset-2">Connectez-vous</button>
+          pour conserver votre historique.
+        </p>
+      </form>
+    </div>
+
+    <!-- Features -->
+    <div class="grid gap-4 sm:grid-cols-3">
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-6 hover:border-brand-500/20 transition-colors group">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-verdict-safe/15 text-verdict-safe group-hover:bg-verdict-safe/20 transition-colors">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <h3 class="mt-4 font-semibold text-[15px]">Verdict instantané</h3>
+        <p class="mt-1.5 text-sm text-slate-400 leading-relaxed">Vert, orange ou rouge selon le niveau de risque détecté par l'analyse.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-6 hover:border-brand-500/20 transition-colors group">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/15 text-brand-400 group-hover:bg-brand-500/20 transition-colors">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        </div>
+        <h3 class="mt-4 font-semibold text-[15px]">Historique conservé</h3>
+        <p class="mt-1.5 text-sm text-slate-400 leading-relaxed">Retrouvez toutes vos analyses passées dans votre tableau de bord personnel.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-6 hover:border-brand-500/20 transition-colors group">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-verdict-warn/15 text-verdict-warn group-hover:bg-verdict-warn/20 transition-colors">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.29 3.86-8.48 14.7A2 2 0 0 0 3.54 22h16.92a2 2 0 0 0 1.73-3.44L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3 class="mt-4 font-semibold text-[15px]">Indices détaillés</h3>
+        <p class="mt-1.5 text-sm text-slate-400 leading-relaxed">SPF, DKIM, DMARC, liens suspects, expéditeur usurpé — chaque signal expliqué.</p>
+      </div>
+    </div>
+
+  </section><!-- /home -->
+
+
+  <!-- ══ RESULT ══ -->
+  <section id="result" data-section class="hidden py-10 space-y-6">
+
+    <!-- Back + title -->
+    <div class="flex items-center gap-4 flex-wrap">
+      <button onclick="goTo('home')" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+        Retour
+      </button>
+      <div>
+        <h2 class="text-2xl font-bold tracking-tight">Résultat de l'analyse</h2>
+        <p class="text-sm text-slate-500 font-mono mt-0.5">facture-orange-2024.eml</p>
+      </div>
+    </div>
+
+    <!-- Verdict banner -->
+    <div class="rounded-2xl border border-verdict-danger/25 bg-gradient-to-r from-verdict-danger/12 to-transparent p-5 flex items-center gap-4">
+      <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-verdict-danger/20 text-verdict-danger font-black text-lg">!</div>
+      <div>
+        <p class="text-xs uppercase tracking-widest font-bold text-verdict-danger">Phishing détecté</p>
+        <p class="text-sm text-slate-300 mt-0.5">Cet email présente plusieurs signaux clairs de tentative de phishing. Ne cliquez sur aucun lien.</p>
+      </div>
+    </div>
+
+    <!-- Score + details -->
+    <div class="grid gap-5 lg:grid-cols-3">
+
+      <!-- Score card -->
+      <div class="rounded-2xl border border-verdict-danger/25 bg-gradient-to-b from-verdict-danger/12 to-ink-900/80 p-6 flex flex-col gap-5">
+        <div class="flex items-center justify-between">
+          <span class="badge badge-danger">
+            <span class="h-1.5 w-1.5 rounded-full bg-verdict-danger animate-pulse"></span>
+            DANGER
+          </span>
+          <span class="font-mono text-[11px] text-slate-500">score / 100</span>
+        </div>
+        <div class="text-center py-2">
+          <div class="text-6xl font-black tabular-nums text-verdict-danger leading-none">87</div>
+          <div class="text-xs text-slate-500 mt-2 uppercase tracking-wider">Risque élevé</div>
+        </div>
+        <!-- Progress bar -->
+        <div>
+          <div class="h-2 w-full overflow-hidden rounded-full bg-white/5">
+            <div class="h-full rounded-full bg-gradient-to-r from-verdict-warn to-verdict-danger" style="width:87%; transition:width 1s ease"></div>
+          </div>
+          <div class="mt-1.5 flex justify-between font-mono text-[10px] text-slate-600">
+            <span>SAFE</span><span>SUSPECT</span><span>DANGER</span>
+          </div>
+        </div>
+        <!-- Meta -->
+        <div class="border-t border-white/5 pt-4 space-y-2 text-xs">
+          <div class="flex justify-between">
+            <span class="text-slate-500">Analysé le</span>
+            <span class="font-mono text-slate-300">09 mai 2026</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-500">Durée</span>
+            <span class="font-mono text-slate-300">0.24 s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Details card -->
+      <div class="lg:col-span-2 rounded-2xl border border-white/10 bg-ink-900/60 p-6 space-y-5">
+        <h3 class="text-sm font-semibold text-slate-200">Indices détectés</h3>
+        <ul class="space-y-2.5 text-sm">
+          <li class="flex gap-3 rounded-xl border border-verdict-danger/20 bg-verdict-danger/5 p-3.5">
+            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-danger/20 text-verdict-danger text-[11px] font-black">!</span>
+            <div>
+              <p class="font-semibold text-slate-100">Domaine expéditeur usurpé</p>
+              <p class="text-slate-400 mt-0.5">Le champ <code class="font-mono text-slate-300">From</code> imite "orange.fr" mais provient de <code class="font-mono text-verdict-danger">orang3-billing.xyz</code>.</p>
+            </div>
+          </li>
+          <li class="flex gap-3 rounded-xl border border-verdict-danger/20 bg-verdict-danger/5 p-3.5">
+            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-danger/20 text-verdict-danger text-[11px] font-black">!</span>
+            <div>
+              <p class="font-semibold text-slate-100">SPF / DKIM / DMARC en échec</p>
+              <p class="text-slate-400 mt-0.5">Les trois mécanismes d'authentification ont échoué pour ce domaine.</p>
+            </div>
+          </li>
+          <li class="flex gap-3 rounded-xl border border-verdict-warn/20 bg-verdict-warn/5 p-3.5">
+            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-warn/20 text-verdict-warn text-[11px] font-black">!</span>
+            <div>
+              <p class="font-semibold text-slate-100">Lien raccourci suspect</p>
+              <p class="text-slate-400 mt-0.5"><code class="font-mono text-slate-300">bit.ly/3xQ-pay</code> redirige vers un domaine inconnu.</p>
+            </div>
+          </li>
+          <li class="flex gap-3 rounded-xl border border-verdict-warn/20 bg-verdict-warn/5 p-3.5">
+            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-warn/20 text-verdict-warn text-[11px] font-black">!</span>
+            <div>
+              <p class="font-semibold text-slate-100">Pression à l'urgence</p>
+              <p class="text-slate-400 mt-0.5">Mots-clés "suspension immédiate", "24h", "vérifier maintenant" détectés.</p>
+            </div>
+          </li>
+        </ul>
+        <!-- Email meta -->
+        <div class="grid sm:grid-cols-2 gap-3 border-t border-white/5 pt-5 text-sm">
+          <div>
+            <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Expéditeur</p>
+            <p class="font-mono text-[13px] text-verdict-danger">facturation@orang3-billing.xyz</p>
+          </div>
+          <div>
+            <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Destinataire</p>
+            <p class="font-mono text-[13px] text-slate-300">utilisateur@exemple.com</p>
+          </div>
+          <div class="sm:col-span-2">
+            <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Sujet</p>
+            <p class="text-slate-200">Votre facture est en attente — suspension dans 24h</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verdict scale -->
+    <div class="grid gap-3 sm:grid-cols-3">
+      <div class="rounded-xl border border-verdict-safe/20 bg-verdict-safe/8 p-4">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="badge badge-safe"><span class="h-1.5 w-1.5 rounded-full bg-verdict-safe"></span> SAFE</span>
+          <span class="font-mono text-[11px] text-slate-500">0 – 33</span>
+        </div>
+        <p class="text-sm text-slate-200">Aucun signe de phishing détecté.</p>
+        <p class="text-xs text-slate-500 mt-0.5">Authentification OK, expéditeur connu.</p>
+      </div>
+      <div class="rounded-xl border border-verdict-warn/20 bg-verdict-warn/8 p-4">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="badge badge-warn"><span class="h-1.5 w-1.5 rounded-full bg-verdict-warn"></span> SUSPECT</span>
+          <span class="font-mono text-[11px] text-slate-500">34 – 66</span>
+        </div>
+        <p class="text-sm text-slate-200">Quelques signaux ambigus détectés.</p>
+        <p class="text-xs text-slate-500 mt-0.5">Vérifiez avant de cliquer ou répondre.</p>
+      </div>
+      <div class="rounded-xl border border-verdict-danger/25 bg-verdict-danger/8 ring-1 ring-verdict-danger/15 p-4">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="badge badge-danger"><span class="h-1.5 w-1.5 rounded-full bg-verdict-danger animate-pulse"></span> DANGER</span>
+          <span class="font-mono text-[11px] text-slate-500">67 – 100</span>
+        </div>
+        <p class="text-sm text-slate-200">Phishing très probable.</p>
+        <p class="text-xs text-slate-500 mt-0.5">Ne cliquez sur aucun lien, supprimez l'email.</p>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex flex-wrap gap-3">
+      <button onclick="goTo('home')"
+              class="flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-bold text-white shadow-xl shadow-brand-500/20 hover:bg-brand-600 transition-colors">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 18 0A9 9 0 0 0 3 12"/><polyline points="3 12 7 12"/><polyline points="12 3 12 7"/></svg>
+        Nouvelle analyse
+      </button>
+      <button onclick="goTo('history')"
+              class="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        Voir l'historique
+      </button>
+    </div>
+
+  </section><!-- /result -->
+
+
+  <!-- ══ HISTORY ══ -->
+  <section id="history" data-section class="hidden py-10 space-y-6">
+
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 class="text-2xl font-bold tracking-tight">Mon historique</h2>
+        <p class="text-sm text-slate-400">Les analyses associées à votre compte.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="h-search" type="text" oninput="filterHistory()" placeholder="Rechercher…"
+                 class="w-44 rounded-xl border border-white/10 bg-ink-800/60 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none">
+        </div>
+        <select id="h-filter" onchange="filterHistory()"
+                class="rounded-xl border border-white/10 bg-ink-800/60 px-3 py-2 text-sm text-slate-200 focus:border-brand-500 focus:outline-none">
+          <option value="">Tous</option>
+          <option value="SAFE">Safe</option>
+          <option value="SUSPECT">Suspect</option>
+          <option value="DANGER">Danger</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Mini stats -->
+    <div class="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div class="rounded-xl border border-white/10 bg-ink-900/60 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Total</p>
+        <p class="mt-1 text-2xl font-bold">4</p>
+      </div>
+      <div class="rounded-xl border border-verdict-safe/20 bg-verdict-safe/8 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-verdict-safe">Safe</p>
+        <p class="mt-1 text-2xl font-bold text-verdict-safe">1</p>
+      </div>
+      <div class="rounded-xl border border-verdict-warn/20 bg-verdict-warn/8 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-verdict-warn">Suspect</p>
+        <p class="mt-1 text-2xl font-bold text-verdict-warn">1</p>
+      </div>
+      <div class="rounded-xl border border-verdict-danger/20 bg-verdict-danger/8 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-verdict-danger">Danger</p>
+        <p class="mt-1 text-2xl font-bold text-verdict-danger">2</p>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto rounded-2xl border border-white/10 bg-ink-900/60">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
+          <tr>
+            <th class="px-4 py-3.5">Fichier</th>
+            <th class="px-4 py-3.5 hidden sm:table-cell">Expéditeur</th>
+            <th class="px-4 py-3.5 hidden md:table-cell">Sujet</th>
+            <th class="px-4 py-3.5">Verdict</th>
+            <th class="px-4 py-3.5 hidden sm:table-cell">Date</th>
+            <th class="px-4 py-3.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5" id="h-tbody">
+          <tr data-verdict="DANGER" class="hover:bg-white/5 transition-colors cursor-pointer">
+            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">facture-orange.eml</td>
+            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">facturation@orang3-billing.xyz</td>
+            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">Votre facture est en attente</td>
+            <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
+            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
+            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
+          </tr>
+          <tr data-verdict="SUSPECT" class="hover:bg-white/5 transition-colors cursor-pointer">
+            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">colis-laposte.eml</td>
+            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">noreply@laposte-suivi.co</td>
+            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">Votre colis n'a pas pu être livré</td>
+            <td class="px-4 py-3.5"><span class="badge badge-warn">SUSPECT</span></td>
+            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">28 avr. 2026</td>
+            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
+          </tr>
+          <tr data-verdict="SAFE" class="hover:bg-white/5 transition-colors cursor-pointer">
+            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">newsletter.eml</td>
+            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">hello@vercel.com</td>
+            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">What's new in v0</td>
+            <td class="px-4 py-3.5"><span class="badge badge-safe">SAFE</span></td>
+            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">26 avr. 2026</td>
+            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
+          </tr>
+          <tr data-verdict="DANGER" class="hover:bg-white/5 transition-colors cursor-pointer">
+            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">banque-alerte.eml</td>
+            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">securite@bnp-verif.click</td>
+            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">Activité suspecte sur votre compte</td>
+            <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
+            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">22 avr. 2026</td>
+            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </section><!-- /history -->
+
+
+  <!-- ══ ADMIN ══ -->
+  <section id="admin" data-section class="hidden py-10 space-y-6">
+
+    <div class="flex items-center gap-3">
+      <h2 class="text-2xl font-bold tracking-tight">Espace administrateur</h2>
+      <span class="rounded-lg border border-brand-500/25 bg-brand-500/10 px-2 py-0.5 text-[11px] font-bold text-brand-400 uppercase tracking-widest">ADMIN</span>
+    </div>
+
+    <!-- Stats grid -->
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Total analyses</p>
+          <svg class="h-4 w-4 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
+        </div>
+        <p class="text-3xl font-bold">1 284</p>
+        <p class="mt-1 text-xs text-brand-400">+12 % cette semaine</p>
+      </div>
+      <div class="rounded-2xl border border-verdict-danger/20 bg-verdict-danger/8 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Phishing</p>
+          <svg class="h-4 w-4 text-verdict-danger/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.29 3.86-8.48 14.7A2 2 0 0 0 3.54 22h16.92a2 2 0 0 0 1.73-3.44L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+        </div>
+        <p class="text-3xl font-bold text-verdict-danger">412</p>
+        <p class="mt-1 text-xs text-slate-500">32 % du total</p>
+      </div>
+      <div class="rounded-2xl border border-verdict-warn/20 bg-verdict-warn/8 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Suspects</p>
+          <svg class="h-4 w-4 text-verdict-warn/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <p class="text-3xl font-bold text-verdict-warn">298</p>
+        <p class="mt-1 text-xs text-slate-500">23 % du total</p>
+      </div>
+      <div class="rounded-2xl border border-brand-500/20 bg-brand-500/8 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Utilisateurs</p>
+          <svg class="h-4 w-4 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87m-4-12a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <p class="text-3xl font-bold">96</p>
+        <p class="mt-1 text-xs text-brand-400">+5 aujourd'hui</p>
+      </div>
+    </div>
+
+    <!-- All scans table -->
+    <div class="rounded-2xl border border-white/10 bg-ink-900/60 overflow-hidden">
+      <div class="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <h3 class="text-sm font-semibold">Toutes les analyses</h3>
+        <button class="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10 transition-colors">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exporter CSV
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="px-4 py-3.5">Utilisateur</th>
+              <th class="px-4 py-3.5">Fichier</th>
+              <th class="px-4 py-3.5 hidden md:table-cell">Expéditeur</th>
+              <th class="px-4 py-3.5">Verdict</th>
+              <th class="px-4 py-3.5 hidden sm:table-cell">Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-300">marie@example.com</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">facture-orange.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">facturation@orang3-billing.xyz</td>
+              <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-500 italic">anonyme</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">paypal-confirm.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">service@paypaI-secure.com</td>
+              <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-300">paul@example.com</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">colis-laposte.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">noreply@laposte-suivi.co</td>
+              <td class="px-4 py-3.5"><span class="badge badge-warn">SUSPECT</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">28 avr. 2026</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-300">marie@example.com</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">newsletter.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">hello@vercel.com</td>
+              <td class="px-4 py-3.5"><span class="badge badge-safe">SAFE</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">26 avr. 2026</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section><!-- /admin -->
+
+
+  <!-- ══ LOGIN ══ -->
+  <section id="login" data-section class="hidden py-10">
+    <div class="mx-auto max-w-md">
+
+      <div class="text-center mb-8">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 ring-1 ring-brand-500/25">
+          <svg class="h-7 w-7 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight">Connexion</h2>
+        <p class="mt-1 text-sm text-slate-400">Accédez à votre historique d'analyses.</p>
+      </div>
+
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-8 space-y-5">
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Identifiant</label>
+          <input id="login-user" type="text" placeholder="votre identifiant"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Mot de passe</label>
+          <div class="relative">
+            <input id="login-pw" type="password" placeholder="••••••••"
+                   class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 pr-11 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+            <button type="button" onclick="togglePw('login-pw',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <button onclick="demoLogin()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors">
+          Se connecter
+        </button>
+        <div class="text-center text-xs text-slate-500 space-y-1.5">
+          <p>Pas encore de compte ? <button onclick="goTo('register')" class="text-brand-400 hover:text-brand-300 font-semibold">Inscription</button></p>
+          <p><button onclick="goTo('home')" class="text-slate-600 hover:text-slate-400">Analyser sans compte →</button></p>
+        </div>
+      </div>
+
+    </div>
+  </section><!-- /login -->
+
+
+  <!-- ══ REGISTER ══ -->
+  <section id="register" data-section class="hidden py-10">
+    <div class="mx-auto max-w-md">
+
+      <div class="text-center mb-8">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 ring-1 ring-brand-500/25">
+          <svg class="h-7 w-7 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight">Créer un compte</h2>
+        <p class="mt-1 text-sm text-slate-400">Conservez l'historique de toutes vos analyses.</p>
+      </div>
+
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-8 space-y-4">
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Identifiant</label>
+          <input type="text" placeholder="choisissez un identifiant"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email</label>
+          <input type="email" placeholder="vous@exemple.com"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Mot de passe</label>
+          <div class="relative">
+            <input id="reg-pw" type="password" placeholder="Au moins 8 caractères"
+                   class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 pr-11 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+            <button type="button" onclick="togglePw('reg-pw',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Confirmer</label>
+          <input type="password" placeholder="Répétez le mot de passe"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <button onclick="demoLogin()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors mt-2">
+          Créer mon compte
+        </button>
+        <p class="text-center text-xs text-slate-500">
+          Déjà inscrit ? <button onclick="goTo('login')" class="text-brand-400 hover:text-brand-300 font-semibold">Connexion</button>
+        </p>
+      </div>
+
+    </div>
+  </section><!-- /register -->
+
+</main>
+
+
+<!-- ════════════════════ FOOTER ════════════════════ -->
+<footer class="border-t border-white/5 py-6 mt-20">
+  <div class="mx-auto max-w-6xl px-6 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-2">
+      <svg class="h-3.5 w-3.5 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
+      <p class="text-xs text-slate-600">Fake Finder · Détecteur de phishing</p>
+    </div>
+    <p class="text-xs text-slate-700">Aucune donnée email n'est conservée après l'analyse</p>
+  </div>
+</footer>
+
+
+<!-- ════════════════════ SCRIPTS ════════════════════ -->
+<script>
+  // ─── Router ────────────────────────────────────────────────────────────────
+  const SECTIONS = document.querySelectorAll('[data-section]');
+  const NAV_BTNS = document.querySelectorAll('[data-nav]');
+
+  function goTo(id) {
+    SECTIONS.forEach(s => {
+      const active = s.id === id;
+      s.classList.toggle('hidden', !active);
+      if (active) {
+        s.classList.remove('fade-in');
+        // Force reflow so animation re-triggers
+        void s.offsetWidth;
+        s.classList.add('fade-in');
+      }
+    });
+    NAV_BTNS.forEach(b => b.classList.toggle('active', b.dataset.nav === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    history.replaceState(null, '', '#' + id);
+  }
+
+  // Init from hash or default
+  goTo(location.hash.slice(1) || 'home');
+
+  // ─── Demo auth ─────────────────────────────────────────────────────────────
+  function demoLogin() {
+    const name = document.getElementById('login-user')?.value?.trim() || 'utilisateur';
+    document.getElementById('auth-out').classList.add('hidden');
+    const authIn = document.getElementById('auth-in');
+    authIn.classList.remove('hidden');
+    authIn.classList.add('flex');
+    document.getElementById('logged-name').textContent = name;
+    document.getElementById('nav-history').classList.remove('hidden');
+    document.getElementById('nav-admin').classList.remove('hidden');
+    goTo('home');
+  }
+
+  function demoLogout() {
+    const authIn = document.getElementById('auth-in');
+    authIn.classList.add('hidden');
+    authIn.classList.remove('flex');
+    document.getElementById('auth-out').classList.remove('hidden');
+    document.getElementById('nav-history').classList.add('hidden');
+    document.getElementById('nav-admin').classList.add('hidden');
+    goTo('home');
+  }
+
+  // ─── Demo result ───────────────────────────────────────────────────────────
+  function showDemoResult() { goTo('result'); }
+
+  // ─── Drag & Drop ───────────────────────────────────────────────────────────
+  const zone       = document.getElementById('drop-zone');
+  const input      = document.getElementById('eml-input');
+  const preview    = document.getElementById('file-preview');
+  const fileNameEl = document.getElementById('file-name');
+  const fileSizeEl = document.getElementById('file-size');
+  const submitBtn  = document.getElementById('submit-btn');
+  const submitText = document.getElementById('submit-text');
+  const errEl      = document.getElementById('upload-error');
+  const clearBtn   = document.getElementById('clear-btn');
+
+  // Click on zone triggers file picker (except on buttons inside)
+  zone.addEventListener('click', e => {
+    if (e.target.closest('button')) return;
+    input.click();
+  });
+
+  // Prevent browser default drop behaviour on the whole page
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop',     e => e.preventDefault());
+
+  zone.addEventListener('dragenter', e => { e.preventDefault(); zone.classList.add('drop-active'); });
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drop-active'); });
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('drop-active'));
+  zone.addEventListener('dragend',   ()  => zone.classList.remove('drop-active'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drop-active');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+
+  input.addEventListener('change', () => {
+    if (input.files.length) handleFile(input.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith('.eml')) {
+      showErr('Seuls les fichiers .eml sont acceptés.');
+      return;
+    }
+    const kb = file.size / 1024;
+    fileNameEl.textContent = file.name;
+    fileSizeEl.textContent = kb > 1024 ? (kb / 1024).toFixed(1) + ' Mo' : Math.round(kb) + ' Ko';
+    preview.classList.remove('hidden');
+    submitBtn.disabled = false;
+    errEl.classList.add('hidden');
+  }
+
+  clearBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    input.value = '';
+    preview.classList.add('hidden');
+    submitBtn.disabled = true;
+  });
+
+  function showErr(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+    setTimeout(() => errEl.classList.add('hidden'), 4000);
+  }
+
+  // Loading state on submit
+  document.getElementById('upload-form').addEventListener('submit', () => {
+    submitText.textContent = 'Analyse en cours…';
+    submitBtn.disabled = true;
+  });
+
+  // ─── History filter ────────────────────────────────────────────────────────
+  function filterHistory() {
+    const q = document.getElementById('h-search').value.toLowerCase();
+    const f = document.getElementById('h-filter').value;
+    document.querySelectorAll('#h-tbody tr').forEach(row => {
+      const text    = row.textContent.toLowerCase();
+      const verdict = row.dataset.verdict;
+      row.classList.toggle('hidden', (q && !text.includes(q)) || (f && verdict !== f));
+    });
+  }
+
+  // ─── Password show/hide ────────────────────────────────────────────────────
+  const EYE_OPEN  = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_SLASH = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    inp.type  = inp.type === 'password' ? 'text' : 'password';
+    btn.innerHTML = inp.type === 'text' ? EYE_SLASH : EYE_OPEN;
+  }
+</script>
+
+</body>
 </html>
