@@ -1,31 +1,293 @@
-<!doctype html>
-<html>
-  <head>
-    <title>FakeFinder - Report</title>
-  </head>
-  <body>
-    <h1>Analysis Complete (Report #{{ report.id }})</h1>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rapport #{{ report.id }} – Fake Finder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink:     { 950:'#070b1a', 900:'#0b1126', 800:'#111a36', 700:'#1a2547' },
+            brand:   { 400:'#7aa2ff', 500:'#4f7cff', 600:'#3a5fe0' },
+            verdict: { safe:'#22c55e', warn:'#f59e0b', danger:'#ef4444' },
+          },
+          fontFamily: {
+            sans: ['Inter','system-ui','sans-serif'],
+            mono: ['JetBrains Mono','ui-monospace','monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background-color: #070b1a;
+      background-image:
+        radial-gradient(ellipse at 18% -8%,  rgba(79,124,255,.18), transparent 52%),
+        radial-gradient(ellipse at 82% 108%, rgba(36,49,96,.35),   transparent 52%);
+      background-attachment: fixed;
+    }
+    ::-webkit-scrollbar       { width:5px; }
+    ::-webkit-scrollbar-track { background:#070b1a; }
+    ::-webkit-scrollbar-thumb { background:#1a2547; border-radius:4px; }
+    .badge { display:inline-flex; align-items:center; gap:5px; border-radius:9999px; padding:3px 10px; font-size:11px; font-weight:700; letter-spacing:.04em; }
+    .badge-safe   { background:rgba(34,197,94,.15);  color:#22c55e; }
+    .badge-warn   { background:rgba(245,158,11,.15); color:#f59e0b; }
+    .badge-danger { background:rgba(239,68,68,.15);  color:#ef4444; }
+  </style>
+</head>
 
-    <h2>Risk Score: {{ report.risk_score }}</h2>
+<body class="font-sans text-slate-100 antialiased min-h-screen flex flex-col">
 
-    <h3>Extracted Data:</h3>
-    <ul>
-      <li>
-        <strong>Sender Domain:</strong> {{ report.header_anomalies.sender_domain
-        }}
-      </li>
-    </ul>
+<!-- HEADER -->
+<header class="sticky top-0 z-50 border-b border-white/5 bg-[#070b1a]/88 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+    <a href="/" class="flex items-center gap-2.5 group">
+      <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/30">
+        <svg class="h-5 w-5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </span>
+      <div class="leading-none">
+        <div class="text-[13px] font-bold tracking-tight">Fake Finder</div>
+        <div class="text-[9px] uppercase tracking-[.26em] text-slate-500">phishing detector</div>
+      </div>
+    </a>
+    <div class="flex items-center gap-3">
+      {% if user.is_authenticated %}
+      <a href="/#history" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+        Mon historique
+      </a>
+      <span class="text-slate-700">|</span>
+      {% endif %}
+      <a href="/" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 18 0A9 9 0 0 0 3 12"/><polyline points="3 12 7 12"/><polyline points="12 3 12 7"/></svg>
+        Nouvelle analyse
+      </a>
+    </div>
+  </div>
+</header>
 
-    <h3>Suspicious URLs Found:</h3>
-    <ul>
-      {% for url in report.suspicious_urls %}
-      <li>{{ url }}</li>
-      {% empty %}
-      <li>No URLs found in this email.</li>
-      {% endfor %}
-    </ul>
+<!-- MAIN -->
+<main class="flex-1 mx-auto w-full max-w-6xl px-6 py-10 space-y-6">
 
-    <br />
-    <a href="/">Scan Another Email</a>
-  </body>
+  {% with meta=report.header_anomalies.0 %}
+
+  <!-- Title row -->
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <p class="text-xs text-slate-500 font-mono mb-1">Rapport #{{ report.id }}</p>
+      <h1 class="text-2xl font-bold tracking-tight">Résultat de l'analyse</h1>
+      {% if meta.filename %}
+        <p class="text-sm text-slate-500 font-mono mt-0.5">{{ meta.filename }}</p>
+      {% endif %}
+    </div>
+    <p class="text-xs text-slate-600 mt-1">{{ report.created_at|date:"d M Y à H:i" }}</p>
+  </div>
+
+  <!-- ── Verdict banner ── -->
+  {% if report.risk_score == 'HIGH' %}
+  <div class="rounded-2xl border border-verdict-danger/25 bg-gradient-to-r from-verdict-danger/12 to-transparent p-5 flex items-center gap-4">
+    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-verdict-danger/20 text-verdict-danger font-black text-lg">!</div>
+    <div>
+      <p class="text-xs uppercase tracking-widest font-bold text-verdict-danger">Phishing détecté</p>
+      <p class="text-sm text-slate-300 mt-0.5">Cet email présente de forts signaux de phishing. Ne cliquez sur aucun lien et supprimez-le.</p>
+    </div>
+  </div>
+  {% elif report.risk_score == 'MEDIUM' %}
+  <div class="rounded-2xl border border-verdict-warn/25 bg-gradient-to-r from-verdict-warn/10 to-transparent p-5 flex items-center gap-4">
+    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-verdict-warn/20 text-verdict-warn font-black text-lg">?</div>
+    <div>
+      <p class="text-xs uppercase tracking-widest font-bold text-verdict-warn">Email suspect</p>
+      <p class="text-sm text-slate-300 mt-0.5">Quelques signaux ambigus ont été détectés. Vérifiez l'expéditeur avant de cliquer ou de répondre.</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-2xl border border-verdict-safe/25 bg-gradient-to-r from-verdict-safe/10 to-transparent p-5 flex items-center gap-4">
+    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-verdict-safe/20 text-verdict-safe font-black text-lg">✓</div>
+    <div>
+      <p class="text-xs uppercase tracking-widest font-bold text-verdict-safe">Email fiable</p>
+      <p class="text-sm text-slate-300 mt-0.5">Aucun signe de phishing détecté. L'email semble légitime.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Score card + Details ── -->
+  <div class="grid gap-5 lg:grid-cols-3">
+
+    <!-- Score card -->
+    <div class="rounded-2xl border p-6 flex flex-col gap-5
+      {% if report.risk_score == 'HIGH' %}border-verdict-danger/25 bg-gradient-to-b from-verdict-danger/12 to-ink-900/80
+      {% elif report.risk_score == 'MEDIUM' %}border-verdict-warn/25 bg-gradient-to-b from-verdict-warn/10 to-ink-900/80
+      {% else %}border-verdict-safe/25 bg-gradient-to-b from-verdict-safe/10 to-ink-900/80{% endif %}">
+
+      <div class="flex items-center justify-between">
+        {% if report.risk_score == 'HIGH' %}
+          <span class="badge badge-danger"><span class="h-1.5 w-1.5 rounded-full bg-verdict-danger animate-pulse"></span> DANGER</span>
+        {% elif report.risk_score == 'MEDIUM' %}
+          <span class="badge badge-warn"><span class="h-1.5 w-1.5 rounded-full bg-verdict-warn animate-pulse"></span> SUSPECT</span>
+        {% else %}
+          <span class="badge badge-safe"><span class="h-1.5 w-1.5 rounded-full bg-verdict-safe"></span> SAFE</span>
+        {% endif %}
+        <span class="font-mono text-[11px] text-slate-500">score IA</span>
+      </div>
+
+      <!-- Numeric score -->
+      <div class="text-center py-2">
+        <div class="text-6xl font-black tabular-nums leading-none
+          {% if report.risk_score == 'HIGH' %}text-verdict-danger
+          {% elif report.risk_score == 'MEDIUM' %}text-verdict-warn
+          {% else %}text-verdict-safe{% endif %}">
+          {{ report.score }}
+        </div>
+        <div class="text-xs text-slate-500 mt-2 uppercase tracking-wider">sur 100</div>
+      </div>
+
+      <!-- Progress bar -->
+      <div>
+        <div class="h-2 w-full overflow-hidden rounded-full bg-white/5">
+          <div class="h-full rounded-full transition-all duration-1000
+            {% if report.risk_score == 'HIGH' %}bg-gradient-to-r from-verdict-warn to-verdict-danger
+            {% elif report.risk_score == 'MEDIUM' %}bg-verdict-warn
+            {% else %}bg-verdict-safe{% endif %}"
+            style="width:{{ report.score }}%"></div>
+        </div>
+        <div class="mt-1.5 flex justify-between font-mono text-[10px] text-slate-600">
+          <span>SAFE</span><span>SUSPECT</span><span>DANGER</span>
+        </div>
+      </div>
+
+      <!-- Meta -->
+      <div class="border-t border-white/5 pt-4 space-y-2 text-xs">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Date</span>
+          <span class="font-mono text-slate-300">{{ report.created_at|date:"d/m/Y" }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Heure</span>
+          <span class="font-mono text-slate-300">{{ report.created_at|date:"H:i" }}</span>
+        </div>
+        {% if report.user %}
+        <div class="flex justify-between">
+          <span class="text-slate-500">Utilisateur</span>
+          <span class="font-mono text-slate-300">{{ report.user.username }}</span>
+        </div>
+        {% else %}
+        <div class="flex justify-between">
+          <span class="text-slate-500">Utilisateur</span>
+          <span class="text-slate-600 italic">anonyme</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Details card -->
+    <div class="lg:col-span-2 rounded-2xl border border-white/10 bg-ink-900/60 p-6 space-y-5">
+
+      <!-- Email metadata -->
+      <h3 class="text-sm font-semibold text-slate-200">Informations de l'email</h3>
+      <div class="grid sm:grid-cols-2 gap-3 text-sm">
+        {% if meta.sender_email %}
+        <div>
+          <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Expéditeur</p>
+          <p class="font-mono text-[13px] {% if report.risk_score == 'HIGH' %}text-verdict-danger{% else %}text-slate-300{% endif %} break-all">{{ meta.sender_email }}</p>
+        </div>
+        {% endif %}
+        {% if meta.sender_domain %}
+        <div>
+          <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Domaine</p>
+          <p class="font-mono text-[13px] text-slate-300">{{ meta.sender_domain }}</p>
+        </div>
+        {% endif %}
+        {% if meta.subject %}
+        <div class="sm:col-span-2">
+          <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Sujet</p>
+          <p class="text-slate-200">{{ meta.subject }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Suspicious URLs -->
+      {% if report.suspicious_urls %}
+      <div class="border-t border-white/5 pt-5">
+        <h3 class="text-sm font-semibold text-slate-200 mb-3">
+          URLs détectées
+          <span class="ml-2 inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 font-mono text-[11px] text-slate-400">{{ report.suspicious_urls|length }}</span>
+        </h3>
+        <ul class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          {% for url in report.suspicious_urls %}
+          <li class="flex items-start gap-2 rounded-lg border border-white/5 bg-ink-800/50 px-3 py-2">
+            <svg class="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span class="font-mono text-[12px] text-slate-300 break-all">{{ url }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% else %}
+      <div class="border-t border-white/5 pt-5">
+        <p class="text-sm text-slate-500">Aucune URL suspecte détectée dans le corps de l'email.</p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- ── Verdict scale ── -->
+  <div class="grid gap-3 sm:grid-cols-3">
+    <div class="rounded-xl border {% if report.risk_score == 'LOW' %}border-verdict-safe/40 ring-1 ring-verdict-safe/20{% else %}border-verdict-safe/15{% endif %} bg-verdict-safe/8 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="badge badge-safe"><span class="h-1.5 w-1.5 rounded-full bg-verdict-safe"></span> SAFE</span>
+        <span class="font-mono text-[11px] text-slate-500">0–34</span>
+      </div>
+      <p class="text-sm text-slate-200">Aucun signe de phishing.</p>
+      <p class="text-xs text-slate-500 mt-0.5">Expéditeur connu, authentification OK.</p>
+    </div>
+    <div class="rounded-xl border {% if report.risk_score == 'MEDIUM' %}border-verdict-warn/40 ring-1 ring-verdict-warn/20{% else %}border-verdict-warn/15{% endif %} bg-verdict-warn/8 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="badge badge-warn"><span class="h-1.5 w-1.5 rounded-full bg-verdict-warn"></span> SUSPECT</span>
+        <span class="font-mono text-[11px] text-slate-500">35–67</span>
+      </div>
+      <p class="text-sm text-slate-200">Signaux ambigus détectés.</p>
+      <p class="text-xs text-slate-500 mt-0.5">Vérifiez avant de cliquer ou répondre.</p>
+    </div>
+    <div class="rounded-xl border {% if report.risk_score == 'HIGH' %}border-verdict-danger/40 ring-1 ring-verdict-danger/20{% else %}border-verdict-danger/15{% endif %} bg-verdict-danger/8 p-4">
+      <div class="flex items-center justify-between mb-2">
+        <span class="badge badge-danger"><span class="h-1.5 w-1.5 rounded-full bg-verdict-danger {% if report.risk_score == 'HIGH' %}animate-pulse{% endif %}"></span> DANGER</span>
+        <span class="font-mono text-[11px] text-slate-500">68–100</span>
+      </div>
+      <p class="text-sm text-slate-200">Phishing très probable.</p>
+      <p class="text-xs text-slate-500 mt-0.5">Ne cliquez sur aucun lien, supprimez.</p>
+    </div>
+  </div>
+
+  <!-- ── Actions ── -->
+  <div class="flex flex-wrap gap-3 pt-2">
+    <a href="/"
+       class="flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-bold text-white shadow-xl shadow-brand-500/20 hover:bg-brand-600 transition-colors">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 18 0A9 9 0 0 0 3 12"/><polyline points="3 12 7 12"/><polyline points="12 3 12 7"/></svg>
+      Nouvelle analyse
+    </a>
+  </div>
+
+  {% endwith %}
+
+</main>
+
+<!-- FOOTER -->
+<footer class="border-t border-white/5 py-6 mt-10">
+  <div class="mx-auto max-w-6xl px-6 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <p class="text-xs text-slate-600">Fake Finder · Détecteur de phishing</p>
+    <p class="text-xs text-slate-700">Aucune donnée email n'est conservée après l'analyse</p>
+  </div>
+</footer>
+
+</body>
 </html>

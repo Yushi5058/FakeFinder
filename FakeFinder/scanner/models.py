@@ -21,6 +21,9 @@ class ScanReport(models.Model):
     # Overall risk assessment
     risk_score = models.CharField(max_length=10, choices=RISK_CHOICES, default="LOW")
 
+    # Numeric score 0–100 produced by the ML model (0 = safe, 100 = phishing)
+    score = models.IntegerField(default=0)
+
     # Storing identified suspicious elements in JSON format
     # This accommodates automatic URL extraction and header anomaly checks
     suspicious_urls = models.JSONField(default=list, blank=True)

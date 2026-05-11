@@ -1,18 +1,902 @@
-<!doctype html>
-<html>
-  <head>
-    <title>FakeFinder - Upload</title>
-  </head>
-  <body>
-    <h1>Upload an Email for Scanning</h1>
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>Fake Finder – Détecteur de phishing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink:  { 950:'#070b1a', 900:'#0b1126', 800:'#111a36', 700:'#1a2547', 600:'#243160' },
+            brand:   { 400:'#7aa2ff', 500:'#4f7cff', 600:'#3a5fe0' },
+            verdict: { safe:'#22c55e', warn:'#f59e0b', danger:'#ef4444' },
+          },
+          fontFamily: {
+            sans: ['Inter','system-ui','sans-serif'],
+            mono: ['JetBrains Mono','ui-monospace','monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background-color: #070b1a;
+      background-image:
+        radial-gradient(ellipse at 18% -8%,  rgba(79,124,255,.20), transparent 52%),
+        radial-gradient(ellipse at 82% 108%, rgba(36,49,96,.38),   transparent 52%);
+      background-attachment: fixed;
+    }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(122,162,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(122,162,255,.045) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .gradient-text {
+      background: linear-gradient(125deg, #7aa2ff 0%, #4f7cff 45%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    @keyframes fadeUp {
+      from { opacity:0; transform:translateY(10px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    .fade-in { animation: fadeUp .28s ease forwards; }
+    @keyframes softPulse {
+      0%,100% { opacity:.45; transform:scale(1);    }
+      50%      { opacity:0;   transform:scale(1.18); }
+    }
+    .anim-ring { animation: softPulse 2.8s ease-in-out infinite; }
+    ::-webkit-scrollbar       { width:5px; }
+    ::-webkit-scrollbar-track { background:#070b1a; }
+    ::-webkit-scrollbar-thumb { background:#1a2547; border-radius:4px; }
 
-    <form method="POST" enctype="multipart/form-data">
-      {% csrf_token %}
-      <label for="email_file">Select an .eml file:</label>
-      <br /><br />
-      <input type="file" name="eml_file" accept=".eml" required />
-      <br /><br />
-      <button type="submit">Scan File</button>
-    </form>
-  </body>
+    /* Badge helpers (no @apply needed) */
+    .badge { display:inline-flex; align-items:center; gap:5px; border-radius:9999px; padding:2px 9px; font-size:11px; font-weight:700; letter-spacing:.03em; }
+    .badge-safe   { background:rgba(34,197,94,.15);  color:#22c55e; }
+    .badge-warn   { background:rgba(245,158,11,.15); color:#f59e0b; }
+    .badge-danger { background:rgba(239,68,68,.15);  color:#ef4444; }
+
+    /* Nav active state */
+    .nav-btn       { color:rgb(148,163,184); transition:color .15s, background .15s; }
+    .nav-btn:hover { color:#fff; background:rgba(255,255,255,.06); }
+    .nav-btn.active { color:#fff; }
+
+    /* Drop-zone drag-over */
+    .drop-active { border-color:rgba(79,124,255,.55) !important; background-color:rgba(79,124,255,.07) !important; }
+  </style>
+</head>
+
+<body class="font-sans text-slate-100 antialiased min-h-screen flex flex-col">
+
+<!-- ════════════════════ HEADER ════════════════════ -->
+<header class="sticky top-0 z-50 border-b border-white/5 bg-[#070b1a]/88 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+
+    <!-- Logo -->
+    <button onclick="goTo('home')" class="flex items-center gap-2.5 group focus:outline-none">
+      <div class="relative">
+        <div class="absolute inset-0 rounded-xl bg-brand-500/25 anim-ring"></div>
+        <span class="relative flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/30">
+          <svg class="h-5 w-5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </span>
+      </div>
+      <div class="leading-none text-left">
+        <div class="text-[13px] font-bold tracking-tight">Fake Finder</div>
+        <div class="text-[9px] uppercase tracking-[.26em] text-slate-500">phishing detector</div>
+      </div>
+    </button>
+
+    <!-- Nav -->
+    <nav class="hidden md:flex items-center gap-0.5">
+      <button data-nav="home"    onclick="goTo('home')"    class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Analyser</button>
+      <button data-nav="history" onclick="goTo('history')" id="nav-history" class="nav-btn rounded-lg px-3.5 py-2 text-[13px] {% if not user.is_authenticated %}hidden{% endif %}">Historique</button>
+      {% if user.is_staff %}<button data-nav="admin" onclick="goTo('admin')" id="nav-admin" class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Admin</button>{% endif %}
+    </nav>
+
+    <!-- Auth -->
+    <div class="flex items-center gap-1.5">
+      <!-- logged-out -->
+      <div id="auth-out" class="{% if user.is_authenticated %}hidden{% else %}flex{% endif %} items-center gap-1.5">
+        <button onclick="goTo('login')"    class="rounded-lg px-3.5 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Connexion</button>
+        <button onclick="goTo('register')" class="rounded-lg bg-brand-500 px-3.5 py-2 text-[13px] font-semibold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600 transition-colors">Inscription</button>
+      </div>
+      <!-- logged-in -->
+      <div id="auth-in" class="{% if user.is_authenticated %}flex{% else %}hidden{% endif %} items-center gap-2">
+        <span class="hidden md:inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-[12px] text-slate-300">
+          <span class="h-1.5 w-1.5 rounded-full bg-verdict-safe animate-pulse"></span>
+          <span id="logged-name">{{ user.username }}</span>
+        </span>
+        <button onclick="realLogout()" class="rounded-lg px-3 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Déconnexion</button>
+      </div>
+    </div>
+
+  </div>
+</header>
+
+<!-- ════════════════════ MAIN ════════════════════ -->
+<main class="flex-1 mx-auto w-full max-w-6xl px-6">
+
+  <!-- ══ HOME ══ -->
+  <section id="home" data-section class="py-14 space-y-14">
+
+    <!-- Hero -->
+    <div class="text-center space-y-5">
+      <!-- Shield icon -->
+      <div class="mx-auto relative inline-flex items-center justify-center">
+        <div class="absolute h-32 w-32 rounded-full bg-brand-500/18 blur-2xl"></div>
+        <div class="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500/25 to-brand-600/10 ring-1 ring-brand-500/30 shadow-xl shadow-brand-500/10">
+          <svg class="h-10 w-10 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Badge -->
+      <span class="inline-flex items-center gap-2 rounded-full border border-brand-500/25 bg-brand-500/10 px-4 py-1.5 text-xs font-semibold text-brand-400">
+        <span class="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse"></span>
+        Analyse heuristique + IA
+      </span>
+
+      <!-- Headline -->
+      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight leading-[1.15]">
+        Détectez les emails frauduleux<br>
+        <span class="gradient-text">en quelques secondes</span>
+      </h1>
+      <p class="mx-auto max-w-lg text-[15px] text-slate-400 leading-relaxed">
+        Importez un fichier <code class="font-mono text-slate-200 bg-white/5 px-1.5 py-0.5 rounded text-[13px]">.eml</code>,
+        Fake Finder analyse les en-têtes, les liens et le contenu pour vous donner un verdict clair avec code couleur.
+      </p>
+    </div>
+
+    <!-- Upload card -->
+    <div class="mx-auto max-w-2xl space-y-4">
+      <form id="upload-form" method="POST" action="{% url 'upload_email' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- Drop zone -->
+        <div id="drop-zone"
+             class="rounded-2xl border-2 border-dashed border-white/15 bg-ink-900/60 p-10 text-center cursor-pointer transition-all duration-200 hover:border-brand-500/35 hover:bg-brand-500/5 grid-bg select-none">
+
+          <!-- Initial prompt (hidden once a file is selected) -->
+          <div id="dz-prompt">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/25">
+              <svg class="h-7 w-7 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="mt-5 text-[15px] font-semibold">Déposez votre fichier <code class="font-mono text-brand-400">.eml</code></p>
+            <p class="mt-1 text-sm text-slate-500">ou cliquez pour parcourir vos fichiers</p>
+          </div>
+
+          <!-- Hidden input -->
+          <input id="eml-input" type="file" name="eml_file" accept=".eml" class="hidden">
+
+          <!-- File selected preview -->
+          <div id="file-preview" class="hidden mt-5 inline-flex items-center gap-2.5 rounded-xl border border-brand-500/25 bg-brand-500/10 px-4 py-2.5">
+            <svg class="h-4 w-4 text-brand-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="file-name" class="text-sm font-medium text-slate-200 max-w-[200px] truncate"></span>
+            <span id="file-size" class="text-xs text-slate-500"></span>
+            <button type="button" id="clear-btn" class="ml-1 text-slate-500 hover:text-slate-300 shrink-0">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+          <p class="mt-4 text-xs text-slate-600">Taille max&nbsp;: 10 Mo · Format&nbsp;: .eml uniquement</p>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex gap-3">
+          <button id="submit-btn" type="submit" disabled
+                  class="flex-1 flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
+            <span id="submit-text">Analyser l'email</span>
+          </button>
+        </div>
+
+        <p id="upload-error" class="hidden text-center text-xs text-verdict-danger"></p>
+
+        {% if not user.is_authenticated %}
+        <p class="text-center text-xs text-slate-600">
+          Aucune connexion requise.
+          <button type="button" onclick="goTo('login')" class="text-slate-500 hover:text-slate-400 underline underline-offset-2">Connectez-vous</button>
+          pour conserver votre historique.
+        </p>
+        {% endif %}
+      </form>
+    </div>
+
+    <!-- Features -->
+    <div class="grid gap-4 sm:grid-cols-3">
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-6 hover:border-brand-500/20 transition-colors group">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-verdict-safe/15 text-verdict-safe group-hover:bg-verdict-safe/20 transition-colors">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <h3 class="mt-4 font-semibold text-[15px]">Verdict instantané</h3>
+        <p class="mt-1.5 text-sm text-slate-400 leading-relaxed">Vert, orange ou rouge selon le niveau de risque détecté par l'analyse.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-6 hover:border-brand-500/20 transition-colors group">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/15 text-brand-400 group-hover:bg-brand-500/20 transition-colors">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+        </div>
+        <h3 class="mt-4 font-semibold text-[15px]">Historique conservé</h3>
+        <p class="mt-1.5 text-sm text-slate-400 leading-relaxed">Retrouvez toutes vos analyses passées dans votre tableau de bord personnel.</p>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-6 hover:border-brand-500/20 transition-colors group">
+        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-verdict-warn/15 text-verdict-warn group-hover:bg-verdict-warn/20 transition-colors">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.29 3.86-8.48 14.7A2 2 0 0 0 3.54 22h16.92a2 2 0 0 0 1.73-3.44L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <h3 class="mt-4 font-semibold text-[15px]">Indices détaillés</h3>
+        <p class="mt-1.5 text-sm text-slate-400 leading-relaxed">SPF, DKIM, DMARC, liens suspects, expéditeur usurpé — chaque signal expliqué.</p>
+      </div>
+    </div>
+
+  </section><!-- /home -->
+
+
+  <!-- ══ HISTORY ══ -->
+  <section id="history" data-section class="hidden py-10 space-y-6">
+
+    <div class="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 class="text-2xl font-bold tracking-tight">Mon historique</h2>
+        <p class="text-sm text-slate-400">Les analyses associées à votre compte.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="relative">
+          <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input id="h-search" type="text" oninput="filterHistory()" placeholder="Rechercher…"
+                 class="w-44 rounded-xl border border-white/10 bg-ink-800/60 py-2 pl-9 pr-3 text-sm text-slate-200 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none">
+        </div>
+        <select id="h-filter" onchange="filterHistory()"
+                class="rounded-xl border border-white/10 bg-ink-800/60 px-3 py-2 text-sm text-slate-200 focus:border-brand-500 focus:outline-none">
+          <option value="">Tous</option>
+          <option value="SAFE">Safe</option>
+          <option value="SUSPECT">Suspect</option>
+          <option value="DANGER">Danger</option>
+        </select>
+        <button onclick="deleteAllReports()"
+                class="flex items-center gap-1.5 rounded-xl border border-verdict-danger/30 bg-verdict-danger/10 px-3 py-2 text-xs font-medium text-verdict-danger hover:bg-verdict-danger/20 transition-colors">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Tout supprimer
+        </button>
+      </div>
+    </div>
+
+    <!-- Mini stats -->
+    <div class="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div class="rounded-xl border border-white/10 bg-ink-900/60 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-slate-500">Total</p>
+        <p id="h-stat-total" class="mt-1 text-2xl font-bold">{{ total_scans|default:0 }}</p>
+      </div>
+      <div class="rounded-xl border border-verdict-safe/20 bg-verdict-safe/8 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-verdict-safe">Safe</p>
+        <p id="h-stat-safe" class="mt-1 text-2xl font-bold text-verdict-safe">{{ safe_count|default:0 }}</p>
+      </div>
+      <div class="rounded-xl border border-verdict-warn/20 bg-verdict-warn/8 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-verdict-warn">Suspect</p>
+        <p id="h-stat-suspect" class="mt-1 text-2xl font-bold text-verdict-warn">{{ suspect_count|default:0 }}</p>
+      </div>
+      <div class="rounded-xl border border-verdict-danger/20 bg-verdict-danger/8 p-4">
+        <p class="text-[10px] uppercase tracking-wider text-verdict-danger">Danger</p>
+        <p id="h-stat-danger" class="mt-1 text-2xl font-bold text-verdict-danger">{{ danger_count|default:0 }}</p>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto rounded-2xl border border-white/10 bg-ink-900/60">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
+          <tr>
+            <th class="px-4 py-3.5">Fichier</th>
+            <th class="px-4 py-3.5 hidden sm:table-cell">Expéditeur</th>
+            <th class="px-4 py-3.5 hidden md:table-cell">Sujet</th>
+            <th class="px-4 py-3.5">Verdict</th>
+            <th class="px-4 py-3.5 hidden sm:table-cell">Date</th>
+            <th class="px-4 py-3.5"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-white/5" id="h-tbody">
+          {% if user_history %}
+            {% for report in user_history %}
+              {% with meta=report.header_anomalies.0 %}
+              <tr data-verdict="{% if report.risk_score == 'HIGH' %}DANGER{% elif report.risk_score == 'MEDIUM' %}SUSPECT{% else %}SAFE{% endif %}"
+                  class="hover:bg-white/5 transition-colors cursor-pointer">
+                <td class="px-4 py-3.5 font-mono text-xs text-slate-300">{{ meta.filename|default:"email.eml" }}</td>
+                <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">{{ meta.sender_email|default:"—" }}</td>
+                <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">{{ meta.subject|default:"—" }}</td>
+                <td class="px-4 py-3.5">
+                  {% if report.risk_score == 'HIGH' %}
+                    <span class="badge badge-danger">DANGER</span>
+                  {% elif report.risk_score == 'MEDIUM' %}
+                    <span class="badge badge-warn">SUSPECT</span>
+                  {% else %}
+                    <span class="badge badge-safe">SAFE</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">{{ report.created_at|date:"d M Y" }}</td>
+                <td class="px-4 py-3.5 text-right">
+                  <div class="flex items-center justify-end gap-3">
+                    <a href="{% url 'report_detail' report.id %}" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</a>
+                    <button onclick="deleteReport({{ report.id }}, this)" class="text-xs text-slate-600 hover:text-verdict-danger transition-colors" title="Supprimer">
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M9 6V4h6v2"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Aucune analyse pour le moment.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+  </section><!-- /history -->
+
+
+  <!-- ══ ADMIN ══ -->
+  <section id="admin" data-section class="hidden py-10 space-y-6">
+
+    <div class="flex items-center gap-3">
+      <h2 class="text-2xl font-bold tracking-tight">Espace administrateur</h2>
+      <span class="rounded-lg border border-brand-500/25 bg-brand-500/10 px-2 py-0.5 text-[11px] font-bold text-brand-400 uppercase tracking-widest">ADMIN</span>
+    </div>
+
+    <!-- Stats grid -->
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Total analyses</p>
+          <svg class="h-4 w-4 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
+        </div>
+        <p class="text-3xl font-bold">1 284</p>
+        <p class="mt-1 text-xs text-brand-400">+12 % cette semaine</p>
+      </div>
+      <div class="rounded-2xl border border-verdict-danger/20 bg-verdict-danger/8 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Phishing</p>
+          <svg class="h-4 w-4 text-verdict-danger/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.29 3.86-8.48 14.7A2 2 0 0 0 3.54 22h16.92a2 2 0 0 0 1.73-3.44L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+        </div>
+        <p class="text-3xl font-bold text-verdict-danger">412</p>
+        <p class="mt-1 text-xs text-slate-500">32 % du total</p>
+      </div>
+      <div class="rounded-2xl border border-verdict-warn/20 bg-verdict-warn/8 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Suspects</p>
+          <svg class="h-4 w-4 text-verdict-warn/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <p class="text-3xl font-bold text-verdict-warn">298</p>
+        <p class="mt-1 text-xs text-slate-500">23 % du total</p>
+      </div>
+      <div class="rounded-2xl border border-brand-500/20 bg-brand-500/8 p-5">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] uppercase tracking-wider text-slate-500">Utilisateurs</p>
+          <svg class="h-4 w-4 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87m-4-12a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <p class="text-3xl font-bold">96</p>
+        <p class="mt-1 text-xs text-brand-400">+5 aujourd'hui</p>
+      </div>
+    </div>
+
+    <!-- All scans table -->
+    <div class="rounded-2xl border border-white/10 bg-ink-900/60 overflow-hidden">
+      <div class="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <h3 class="text-sm font-semibold">Toutes les analyses</h3>
+        <button class="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10 transition-colors">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exporter CSV
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
+            <tr>
+              <th class="px-4 py-3.5">Utilisateur</th>
+              <th class="px-4 py-3.5">Fichier</th>
+              <th class="px-4 py-3.5 hidden md:table-cell">Expéditeur</th>
+              <th class="px-4 py-3.5">Verdict</th>
+              <th class="px-4 py-3.5 hidden sm:table-cell">Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-300">marie@example.com</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">facture-orange.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">facturation@orang3-billing.xyz</td>
+              <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-500 italic">anonyme</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">paypal-confirm.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">service@paypaI-secure.com</td>
+              <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-300">paul@example.com</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">colis-laposte.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">noreply@laposte-suivi.co</td>
+              <td class="px-4 py-3.5"><span class="badge badge-warn">SUSPECT</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">28 avr. 2026</td>
+            </tr>
+            <tr class="hover:bg-white/5 transition-colors">
+              <td class="px-4 py-3.5 text-sm text-slate-300">marie@example.com</td>
+              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">newsletter.eml</td>
+              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">hello@vercel.com</td>
+              <td class="px-4 py-3.5"><span class="badge badge-safe">SAFE</span></td>
+              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">26 avr. 2026</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </section><!-- /admin -->
+
+
+  <!-- ══ LOGIN ══ -->
+  <section id="login" data-section class="hidden py-10">
+    <div class="mx-auto max-w-md">
+
+      <div class="text-center mb-8">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 ring-1 ring-brand-500/25">
+          <svg class="h-7 w-7 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight">Connexion</h2>
+        <p class="mt-1 text-sm text-slate-400">Accédez à votre historique d'analyses.</p>
+      </div>
+
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-8 space-y-5">
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Identifiant</label>
+          <input id="login-user" type="text" placeholder="votre identifiant"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Mot de passe</label>
+          <div class="relative">
+            <input id="login-pw" type="password" placeholder="••••••••"
+                   class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 pr-11 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+            <button type="button" onclick="togglePw('login-pw',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle fill="none" cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <p id="login-error" class="hidden text-xs text-verdict-danger text-center"></p>
+        <button onclick="realLogin()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors">
+          Se connecter
+        </button>
+        <div class="text-center text-xs text-slate-500 space-y-1.5">
+          <p>Pas encore de compte ? <button onclick="goTo('register')" class="text-brand-400 hover:text-brand-300 font-semibold">Inscription</button></p>
+          <p><button onclick="goTo('home')" class="text-slate-600 hover:text-slate-400">Analyser sans compte →</button></p>
+        </div>
+      </div>
+
+    </div>
+  </section><!-- /login -->
+
+
+  <!-- ══ REGISTER ══ -->
+  <section id="register" data-section class="hidden py-10">
+    <div class="mx-auto max-w-md">
+
+      <div class="text-center mb-8">
+        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/15 ring-1 ring-brand-500/25">
+          <svg class="h-7 w-7 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight">Créer un compte</h2>
+        <p class="mt-1 text-sm text-slate-400">Conservez l'historique de toutes vos analyses.</p>
+      </div>
+
+      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-8 space-y-4">
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Identifiant</label>
+          <input id="reg-user" type="text" placeholder="choisissez un identifiant"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email</label>
+          <input id="reg-email" type="email" placeholder="vous@exemple.com"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Mot de passe</label>
+          <div class="relative">
+            <input id="reg-pw" type="password" placeholder="Au moins 8 caractères"
+                   class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 pr-11 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+            <button type="button" onclick="togglePw('reg-pw',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle fill="none" cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Confirmer</label>
+          <input id="reg-confirm" type="password" placeholder="Répétez le mot de passe"
+                 class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
+        </div>
+        <p id="reg-error" class="hidden text-xs text-verdict-danger text-center"></p>
+        <button onclick="realRegister()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors mt-2">
+          Créer mon compte
+        </button>
+        <p class="text-center text-xs text-slate-500">
+          Déjà inscrit ? <button onclick="goTo('login')" class="text-brand-400 hover:text-brand-300 font-semibold">Connexion</button>
+        </p>
+      </div>
+
+    </div>
+  </section><!-- /register -->
+
+</main>
+
+
+<!-- ════════════════════ FOOTER ════════════════════ -->
+<footer class="border-t border-white/5 py-6 mt-20">
+  <div class="mx-auto max-w-6xl px-6 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-2">
+      <svg class="h-3.5 w-3.5 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
+      <p class="text-xs text-slate-600">Fake Finder · Détecteur de phishing</p>
+    </div>
+    <p class="text-xs text-slate-700">Aucune donnée email n'est conservée après l'analyse</p>
+  </div>
+</footer>
+
+
+<!-- ════════════════════ CONFIRM MODAL ════════════════════ -->
+<div id="confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+  <div class="w-full max-w-sm rounded-2xl border border-white/10 bg-ink-900 p-6 shadow-2xl">
+    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-verdict-danger/15 text-verdict-danger mx-auto mb-4">
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+      </svg>
+    </div>
+    <h3 id="confirm-title" class="text-center text-[15px] font-bold text-slate-100 mb-1">Confirmer</h3>
+    <p  id="confirm-msg"   class="text-center text-sm text-slate-400 mb-6 leading-relaxed"></p>
+    <div class="flex gap-3">
+      <button id="confirm-cancel"
+              class="flex-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors">
+        Annuler
+      </button>
+      <button id="confirm-ok"
+              class="flex-1 rounded-xl bg-verdict-danger py-2.5 text-sm font-bold text-white hover:bg-red-600 transition-colors">
+        Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ SCRIPTS ════════════════════ -->
+<script>
+  // ─── Router ────────────────────────────────────────────────────────────────
+  const SECTIONS        = document.querySelectorAll('[data-section]');
+  const NAV_BTNS        = document.querySelectorAll('[data-nav]');
+  const IS_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
+
+  function goTo(id) {
+    // Guard: protected sections require authentication
+    if ((id === 'history' || id === 'admin') && !IS_AUTHENTICATED) {
+      id = 'login';
+    }
+    SECTIONS.forEach(s => {
+      const active = s.id === id;
+      s.classList.toggle('hidden', !active);
+      if (active) {
+        s.classList.remove('fade-in');
+        void s.offsetWidth; // Force reflow so animation re-triggers
+        s.classList.add('fade-in');
+      }
+    });
+    NAV_BTNS.forEach(b => b.classList.toggle('active', b.dataset.nav === id));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    history.replaceState(null, '', '#' + id);
+  }
+
+  // Init from hash or default
+  goTo(location.hash.slice(1) || 'home');
+
+  // ─── Auth (real Django) ────────────────────────────────────────────────────
+  function getCsrfToken() {
+    const name = 'csrftoken=';
+    for (const part of document.cookie.split(';')) {
+      const c = part.trim();
+      if (c.startsWith(name)) return decodeURIComponent(c.slice(name.length));
+    }
+    return '';
+  }
+
+  async function realLogin() {
+    const username = document.getElementById('login-user').value.trim();
+    const password = document.getElementById('login-pw').value;
+    const errEl    = document.getElementById('login-error');
+    errEl.classList.add('hidden');
+    try {
+      const resp = await fetch('/login/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.ok) {
+        window.location.href = '/';
+      } else {
+        errEl.textContent = data.error || 'Erreur de connexion (' + resp.status + ').';
+        errEl.classList.remove('hidden');
+      }
+    } catch {
+      errEl.textContent = 'Erreur réseau, réessayez.';
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  async function realLogout() {
+    await fetch('/logout/', { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() } });
+    window.location.href = '/';
+  }
+
+  async function realRegister() {
+    const username = document.getElementById('reg-user').value.trim();
+    const email    = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-pw').value;
+    const confirm  = document.getElementById('reg-confirm').value;
+    const errEl    = document.getElementById('reg-error');
+    errEl.classList.add('hidden');
+    try {
+      const resp = await fetch('/register/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+        body: JSON.stringify({ username, email, password, confirm }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.ok) {
+        window.location.href = '/';
+      } else {
+        errEl.textContent = data.error || 'Erreur lors de l\'inscription (' + resp.status + ').';
+        errEl.classList.remove('hidden');
+      }
+    } catch {
+      errEl.textContent = 'Erreur réseau, réessayez.';
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  // ─── Confirm modal ─────────────────────────────────────────────────────────
+  function showConfirm(title, message) {
+    return new Promise(resolve => {
+      const modal     = document.getElementById('confirm-modal');
+      const okBtn     = document.getElementById('confirm-ok');
+      const cancelBtn = document.getElementById('confirm-cancel');
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-msg').textContent   = message;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      function cleanup(result) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+      function onOk()     { cleanup(true);  }
+      function onCancel() { cleanup(false); }
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      modal.addEventListener('click', e => { if (e.target === modal) cleanup(false); }, { once: true });
+    });
+  }
+
+  // ─── Drag & Drop ───────────────────────────────────────────────────────────
+  const zone       = document.getElementById('drop-zone');
+  const input      = document.getElementById('eml-input');
+  const preview    = document.getElementById('file-preview');
+  const fileNameEl = document.getElementById('file-name');
+  const fileSizeEl = document.getElementById('file-size');
+  const submitBtn  = document.getElementById('submit-btn');
+  const submitText = document.getElementById('submit-text');
+  const errEl      = document.getElementById('upload-error');
+  const clearBtn   = document.getElementById('clear-btn');
+  const dzPrompt   = document.getElementById('dz-prompt');
+
+  // Click anywhere on the zone triggers the file picker.
+  // clearBtn has stopPropagation so its clicks never reach here.
+  zone.addEventListener('click', () => input.click());
+
+  // Prevent browser default drop on the whole page
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop',     e => e.preventDefault());
+
+  // Counter prevents dragleave firing on child elements causing flicker
+  let dragCounter = 0;
+  zone.addEventListener('dragenter', e => { e.preventDefault(); dragCounter++; zone.classList.add('drop-active'); });
+  zone.addEventListener('dragover',  e => { e.preventDefault(); });
+  zone.addEventListener('dragleave', () => { if (--dragCounter <= 0) { dragCounter = 0; zone.classList.remove('drop-active'); } });
+  zone.addEventListener('dragend',   () => { dragCounter = 0; zone.classList.remove('drop-active'); });
+
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    zone.classList.remove('drop-active');
+    const files = e.dataTransfer.files;
+    // No file dropped (e.g. user dragged then cancelled) → keep current state
+    if (!files.length) return;
+    handleFile(files[0]);
+  });
+
+  // Last successfully validated file — survives picker cancels and invalid drops.
+  let currentFile = null;
+
+  // Sync input.files to a given File object (no-op on Safari where files is read-only)
+  function assignToInput(file) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+    } catch { /* Safari: form will still submit via currentFile guard in submit handler */ }
+  }
+
+  // Restore input.files to currentFile, or clear it if no valid file exists
+  function restoreInputFiles() {
+    if (currentFile) {
+      assignToInput(currentFile);
+    } else {
+      try { input.value = ''; } catch {}
+    }
+  }
+
+  input.addEventListener('change', () => {
+    if (input.files && input.files.length > 0) {
+      handleFile(input.files[0]);
+    } else {
+      // Picker cancelled — restore input.files to the last valid file (may be null)
+      restoreInputFiles();
+    }
+  });
+
+  function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith('.eml')) {
+      showErr('Seuls les fichiers .eml sont acceptés.');
+      restoreInputFiles(); // Keep input in sync with currentFile
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      showErr('Fichier trop volumineux (max 10 Mo).');
+      restoreInputFiles();
+      return;
+    }
+    // Validation passed — commit the new file
+    currentFile = file;
+    assignToInput(file);
+    const kb = file.size / 1024;
+    fileNameEl.textContent = file.name;
+    fileSizeEl.textContent = kb > 1024 ? (kb / 1024).toFixed(1) + ' Mo' : Math.round(kb) + ' Ko';
+    dzPrompt.classList.add('hidden');
+    preview.classList.remove('hidden');
+    submitBtn.disabled = false;
+    errEl.classList.add('hidden');
+  }
+
+  clearBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    currentFile = null;
+    input.value = '';
+    preview.classList.add('hidden');
+    dzPrompt.classList.remove('hidden');
+    submitBtn.disabled = true;
+  });
+
+  function showErr(msg) {
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+    setTimeout(() => errEl.classList.add('hidden'), 4000);
+  }
+
+  // Before submitting, ensure input.files is in sync with currentFile
+  // (some browsers clear input.files when the picker is opened then cancelled)
+  document.getElementById('upload-form').addEventListener('submit', e => {
+    if (currentFile && (!input.files || !input.files.length)) {
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(currentFile);
+        input.files = dt.files;
+      } catch {
+        e.preventDefault();
+        showErr('Erreur fichier. Veuillez resélectionner le fichier.');
+        submitBtn.disabled = false;
+        submitText.textContent = "Analyser l'email";
+        return;
+      }
+    }
+    submitText.textContent = 'Analyse en cours…';
+    submitBtn.disabled = true;
+  });
+
+  // ─── History filter ────────────────────────────────────────────────────────
+  function filterHistory() {
+    const q = document.getElementById('h-search').value.toLowerCase();
+    const f = document.getElementById('h-filter').value;
+    document.querySelectorAll('#h-tbody tr').forEach(row => {
+      const text    = row.textContent.toLowerCase();
+      const verdict = row.dataset.verdict;
+      row.classList.toggle('hidden', (q && !text.includes(q)) || (f && verdict !== f));
+    });
+  }
+
+  // ─── History delete ────────────────────────────────────────────────────────
+  function updateHistoryStats() {
+    const rows = [...document.querySelectorAll('#h-tbody tr[data-verdict]')];
+    document.getElementById('h-stat-total').textContent  = rows.length;
+    document.getElementById('h-stat-safe').textContent   = rows.filter(r => r.dataset.verdict === 'SAFE').length;
+    document.getElementById('h-stat-suspect').textContent = rows.filter(r => r.dataset.verdict === 'SUSPECT').length;
+    document.getElementById('h-stat-danger').textContent  = rows.filter(r => r.dataset.verdict === 'DANGER').length;
+  }
+
+  async function deleteReport(id, btn) {
+    const ok = await showConfirm(
+      'Supprimer ce rapport',
+      'Le rapport sera définitivement supprimé. Cette action est irréversible.'
+    );
+    if (!ok) return;
+    const resp = await fetch(`/report/${id}/delete/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    });
+    if (resp.ok) {
+      btn.closest('tr').remove();
+      const tbody = document.getElementById('h-tbody');
+      if (!tbody.querySelector('tr[data-verdict]')) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Aucune analyse pour le moment.</td></tr>';
+      }
+      updateHistoryStats();
+    }
+  }
+
+  async function deleteAllReports() {
+    const ok = await showConfirm(
+      'Supprimer tout l\'historique',
+      'Tous vos rapports d\'analyse seront définitivement supprimés. Cette action est irréversible.'
+    );
+    if (!ok) return;
+    const resp = await fetch('/history/delete/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    });
+    if (resp.ok) {
+      document.getElementById('h-tbody').innerHTML =
+        '<tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Aucune analyse pour le moment.</td></tr>';
+      updateHistoryStats();
+    }
+  }
+
+  // ─── Password show/hide ────────────────────────────────────────────────────
+  const EYE_OPEN  = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle fill="none" cx="12" cy="12" r="3"/></svg>';
+  const EYE_SLASH = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+  function togglePw(id, btn) {
+    const inp = document.getElementById(id);
+    inp.type  = inp.type === 'password' ? 'text' : 'password';
+    btn.innerHTML = inp.type === 'text' ? EYE_SLASH : EYE_OPEN;
+  }
+</script>
+
+</body>
 </html>
