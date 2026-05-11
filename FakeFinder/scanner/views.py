@@ -1,6 +1,7 @@
 import json
 import re
 import time
+import logging
 from pathlib import Path
 
 import joblib
@@ -17,6 +18,8 @@ from django.views.decorators.http import require_POST
 from .models import ScanReport
 from .utils import parse_eml_in_memory
 
+logger = logging.getLogger(__name__)
+
 # ── ML model — loaded once on first use ──────────────────────────────────────
 
 _model_bundle = None
@@ -27,7 +30,10 @@ def _get_model():
     """Load the model bundle from disk the first time it is needed."""
     global _model_bundle
     if _model_bundle is None and MODEL_PATH.exists():
-        _model_bundle = joblib.load(MODEL_PATH)
+        try:
+            _model_bundle = joblib.load(MODEL_PATH)
+        except Exception as e:
+            logger.error(f"Failed to load ML model from {MODEL_PATH}: {e}")
     return _model_bundle
 
 
@@ -44,11 +50,22 @@ _SAFE_SENDER_ROOTS: frozenset[str] = frozenset({
     "vercel.com", "netlify.com", "heroku.com", "cloudflare.com",
     "stackoverflow.com", "npmjs.com", "pypi.org",
     "atlassian.com", "jira.com", "confluence.com",
+    "google.co.uk", "amazon.co.uk", "amazon.de", "google.fr",
 })
 
 
 def _root_domain(domain: str) -> str:
+    """
+    Extract the root domain (e.g., example.com from sub.example.com).
+    Handles common multi-part TLDs like .co.uk.
+    """
+    if not domain:
+        return ""
     parts = domain.lower().strip().split(".")
+    if len(parts) >= 3:
+        # Check for common multi-part TLDs (co.uk, com.br, etc.)
+        if parts[-2] in ("co", "com", "net", "org", "edu", "gov") and len(parts[-1]) == 2:
+            return ".".join(parts[-3:])
     return ".".join(parts[-2:]) if len(parts) >= 2 else domain
 
 
@@ -81,8 +98,8 @@ def _adjust_proba(proba: float, parsed_data: dict) -> float:
             url_roots.discard("")
             if url_roots and url_roots.issubset(_SAFE_SENDER_ROOTS):
                 proba = max(0.0, proba - 0.20)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error during URL domain analysis: {e}")
 
     return max(0.0, min(1.0, proba))
 
@@ -96,6 +113,7 @@ def _predict(parsed_data: dict) -> tuple:
     """
     bundle = _get_model()
     if bundle is None:
+        logger.warning("ML model bundle not found. Using fallback prediction.")
         return "MEDIUM", 50
 
     from ml.features import prepare_email_text, probability_to_verdict
@@ -142,7 +160,7 @@ def upload_email(request):
         )
 
         elapsed = time.perf_counter() - pipeline_start
-        print(f"[Benchmark] Parse + ML + Save: {elapsed:.3f}s")
+        logger.info(f"[Benchmark] Parse + ML + Save: {elapsed:.3f}s")
 
         return redirect("report_detail", report_id=report.id)
 
