@@ -1,4 +1,7 @@
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineBenchmarkMiddleware:
@@ -9,5 +12,5 @@ class PipelineBenchmarkMiddleware:
         start = time.perf_counter()
         response = self.get_response(request)
         elapsed = time.perf_counter() - start
-        print(f"[Benchmark] {request.method} {request.path} — {elapsed:.3f}s")
+        logger.info(f"[Benchmark] {request.method} {request.path} — {elapsed:.3f}s")
         return response

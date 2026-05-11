@@ -124,7 +124,7 @@ def train(csv_path: str, output_path: str, n_trees: int):
         n_estimators=n_trees,
         class_weight="balanced",
         random_state=42,
-        n_jobs=-1,
+        n_jobs=1,
     )
     # CalibratedClassifierCV corrects RF probability bias (tendency to cluster near 0.5)
     # isotonic regression works well for large datasets (>1000 samples)
