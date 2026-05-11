@@ -24,13 +24,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-!%1o4bq-l8$jo8h#2ij0@tbzls$k4-fa-rx+yaldhw(96l%f(k"
+# Secret key — must be set via DJANGO_SECRET_KEY env var in production.
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-!%1o4bq-l8$jo8h#2ij0@tbzls$k4-fa-rx+yaldhw(96l%f(k",
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "True").lower() == "true"
 
-ALLOWED_HOSTS = []
+_allowed = os.getenv("DJANGO_ALLOWED_HOSTS", "")
+ALLOWED_HOSTS = _allowed.split(",") if _allowed else ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -115,7 +118,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Africa/Casablanca"
 
 USE_I18N = True
 
@@ -131,3 +134,17 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ── Security headers (always active) ─────────────────────────────────────────
+SECURE_CONTENT_TYPE_NOSNIFF = True        # X-Content-Type-Options: nosniff
+X_FRAME_OPTIONS = "DENY"                  # X-Frame-Options: DENY
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+# ── Production-only hardening (activated when DEBUG=False) ────────────────────
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True

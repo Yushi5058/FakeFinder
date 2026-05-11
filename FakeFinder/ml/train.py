@@ -35,7 +35,25 @@ from sklearn.model_selection import train_test_split
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from ml.features import CombinedFeatureTransformer  # noqa: E402
+from ml.features import CombinedFeatureTransformer, prepare_email_text  # noqa: E402
+
+
+def _csv_row_to_text(raw_text: str) -> str:
+    """
+    Wrap a raw CSV email body in the same dict structure that parse_eml_in_memory()
+    produces, then pass it through prepare_email_text().
+
+    This ensures the feature distribution at training time matches inference time,
+    fixing the mismatch that caused legitimate emails (e.g. GitHub notifications)
+    to be misclassified.
+    """
+    return prepare_email_text({
+        "subject":       "",
+        "sender_email":  "",
+        "sender_domain": "",
+        "body_text":     str(raw_text),
+        "urls":          [],
+    })
 
 
 # ── Dataset loading ───────────────────────────────────────────────────────────
@@ -43,7 +61,7 @@ from ml.features import CombinedFeatureTransformer  # noqa: E402
 def load_dataset(csv_path: str):
     """
     Load the Kaggle Phishing Email CSV.
-    Returns X (array of email strings) and y (array of 0/1 labels).
+    Returns X (array of prepared email strings) and y (array of 0/1 labels).
     """
     df = pd.read_csv(csv_path)
     print(f"Loaded {len(df)} rows. Columns: {list(df.columns)}")
@@ -74,7 +92,12 @@ def load_dataset(csv_path: str):
     n_safe  = int((df["label"] == 0).sum())
     print(f"  {n_phish} phishing emails, {n_safe} safe emails\n")
 
-    return df["text"].values, df["label"].values
+    # Apply the same text preparation as inference so train/predict distributions match.
+    # dtype=object avoids the massive fixed-width Unicode allocation that np.array()
+    # would attempt when strings vary wildly in length.
+    print("Preprocessing text (matching inference pipeline)…")
+    X_prepared = np.array([_csv_row_to_text(t) for t in df["text"].values], dtype=object)
+    return X_prepared, df["label"].values
 
 
 # ── Training ──────────────────────────────────────────────────────────────────
@@ -112,10 +135,10 @@ def train(csv_path: str, output_path: str, n_trees: int):
     y_pred  = clf.predict(X_test_feat)
     y_proba = clf.predict_proba(X_test_feat)[:, 1]
 
-    print("\n── Evaluation results ─────────────────────────────────────────")
+    print("\n-- Evaluation results -----------------------------------------")
     print(classification_report(y_test, y_pred, target_names=["Safe", "Phishing"]))
     print(f"ROC-AUC : {roc_auc_score(y_test, y_proba):.4f}")
-    print("───────────────────────────────────────────────────────────────\n")
+    print("---------------------------------------------------------------\n")
 
     # ── Save model bundle ─────────────────────────────────────────────────────
     bundle = {

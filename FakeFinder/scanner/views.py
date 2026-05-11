@@ -1,10 +1,18 @@
+import json
+import re
 import time
 from pathlib import Path
 
 import joblib
 from django.conf import settings
-from django.http import HttpResponseBadRequest
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import User
+from django.core.cache import cache
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from django.http import HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from .models import ScanReport
 from .utils import parse_eml_in_memory
@@ -23,6 +31,62 @@ def _get_model():
     return _model_bundle
 
 
+# ── Trusted sender roots (root domain only, e.g. "github.com") ───────────────
+# Used to correct ML over-detection on legitimate transactional/notification email.
+_SAFE_SENDER_ROOTS: frozenset[str] = frozenset({
+    "github.com", "githubusercontent.com", "gitlab.com", "bitbucket.org",
+    "google.com", "gmail.com", "googlemail.com", "googlegroups.com",
+    "microsoft.com", "outlook.com", "live.com", "hotmail.com", "office.com",
+    "apple.com", "icloud.com",
+    "amazon.com", "amazonaws.com",
+    "linkedin.com", "twitter.com", "x.com",
+    "slack.com", "dropbox.com", "zoom.us", "notion.so",
+    "vercel.com", "netlify.com", "heroku.com", "cloudflare.com",
+    "stackoverflow.com", "npmjs.com", "pypi.org",
+    "atlassian.com", "jira.com", "confluence.com",
+})
+
+
+def _root_domain(domain: str) -> str:
+    parts = domain.lower().strip().split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else domain
+
+
+def _adjust_proba(proba: float, parsed_data: dict) -> float:
+    """
+    Apply lightweight rule-based corrections on top of the raw ML probability.
+
+    - Trusted sender domain  → large downward correction
+    - All URLs from trusted domains → additional downward correction
+
+    This compensates for training/inference distribution mismatch: the model was
+    trained on body-only text while legitimate transactional emails (GitHub, etc.)
+    contain many links and account-related words that superficially resemble phishing.
+    """
+    sender_domain = parsed_data.get("sender_domain", "")
+    urls          = parsed_data.get("urls", [])
+
+    if sender_domain:
+        root = _root_domain(sender_domain)
+        if root in _SAFE_SENDER_ROOTS:
+            proba = max(0.0, proba - 0.45)
+
+    if urls:
+        try:
+            from urllib.parse import urlparse
+            url_roots = {
+                _root_domain(urlparse(u).hostname or "")
+                for u in urls if u
+            }
+            url_roots.discard("")
+            if url_roots and url_roots.issubset(_SAFE_SENDER_ROOTS):
+                proba = max(0.0, proba - 0.20)
+        except Exception:
+            pass
+
+    return max(0.0, min(1.0, proba))
+
+
 def _predict(parsed_data: dict) -> tuple:
     """
     Run the ML model on the parsed email data.
@@ -32,7 +96,6 @@ def _predict(parsed_data: dict) -> tuple:
     """
     bundle = _get_model()
     if bundle is None:
-        # Model not trained yet — neutral fallback
         return "MEDIUM", 50
 
     from ml.features import prepare_email_text, probability_to_verdict
@@ -42,7 +105,8 @@ def _predict(parsed_data: dict) -> tuple:
     classifier  = bundle["classifier"]
 
     features = transformer.transform([text])
-    proba = classifier.predict_proba(features)[0][1]   # P(phishing)
+    proba    = classifier.predict_proba(features)[0][1]   # P(phishing)
+    proba    = _adjust_proba(proba, parsed_data)
     return probability_to_verdict(proba)
 
 
@@ -82,9 +146,107 @@ def upload_email(request):
 
         return redirect("report_detail", report_id=report.id)
 
-    return render(request, "scanner/upload.html")
+    context = {}
+    if request.user.is_authenticated:
+        all_reports = ScanReport.objects.filter(user=request.user)
+        context['user_history'] = all_reports.order_by('-created_at')[:50]
+        context['total_scans'] = all_reports.count()
+        context['safe_count'] = all_reports.filter(risk_score='LOW').count()
+        context['suspect_count'] = all_reports.filter(risk_score='MEDIUM').count()
+        context['danger_count'] = all_reports.filter(risk_score='HIGH').count()
+    return render(request, "scanner/upload.html", context)
 
 
 def report_detail(request, report_id):
     report = get_object_or_404(ScanReport, id=report_id)
+    # Reports owned by a user are private — only the owner may view them.
+    # Anonymous reports (user=None) remain accessible via direct link.
+    if report.user is not None and report.user != request.user:
+        return HttpResponseForbidden("Accès non autorisé.")
     return render(request, "scanner/report.html", {"report": report})
+
+
+@require_POST
+def delete_report(request, report_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'ok': False}, status=403)
+    report = get_object_or_404(ScanReport, id=report_id, user=request.user)
+    report.delete()
+    return JsonResponse({'ok': True})
+
+
+@require_POST
+def delete_all_reports(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'ok': False}, status=403)
+    ScanReport.objects.filter(user=request.user).delete()
+    return JsonResponse({'ok': True})
+
+
+@require_POST
+def login_view(request):
+    ip        = request.META.get('REMOTE_ADDR', 'unknown')
+    cache_key = f'login_attempts_{ip}'
+    attempts  = cache.get(cache_key, 0)
+    if attempts >= 10:
+        return JsonResponse(
+            {'ok': False, 'error': 'Trop de tentatives. Réessayez dans 5 minutes.'},
+            status=429,
+        )
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'Requête invalide.'}, status=400)
+
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    user = authenticate(request, username=username, password=password)
+    if user:
+        cache.delete(cache_key)
+        login(request, user)
+        return JsonResponse({'ok': True, 'username': user.username, 'is_staff': user.is_staff})
+
+    cache.set(cache_key, attempts + 1, 300)  # 5-minute window
+    return JsonResponse({'ok': False, 'error': 'Identifiant ou mot de passe incorrect.'}, status=400)
+
+
+@require_POST
+def logout_view(request):
+    logout(request)
+    return JsonResponse({'ok': True})
+
+
+@require_POST
+def register_view(request):
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'error': 'Requête invalide.'}, status=400)
+
+    username = data.get('username', '').strip()
+    email    = data.get('email', '').strip()
+    password = data.get('password', '')
+    confirm  = data.get('confirm', '')
+
+    if not username or not password:
+        return JsonResponse({'ok': False, 'error': 'Identifiant et mot de passe requis.'}, status=400)
+    if len(username) > 150:
+        return JsonResponse({'ok': False, 'error': "L'identifiant ne peut pas dépasser 150 caractères."}, status=400)
+    if not re.match(r'^[\w.@+-]+$', username):
+        return JsonResponse({'ok': False, 'error': "L'identifiant ne peut contenir que des lettres, chiffres et les caractères . @ + - _"}, status=400)
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse({'ok': False, 'error': 'Adresse email invalide.'}, status=400)
+    if password != confirm:
+        return JsonResponse({'ok': False, 'error': 'Les mots de passe ne correspondent pas.'}, status=400)
+    if len(password) < 8:
+        return JsonResponse({'ok': False, 'error': 'Le mot de passe doit contenir au moins 8 caractères.'}, status=400)
+    if User.objects.filter(username=username).exists():
+        return JsonResponse({'ok': False, 'error': 'Cet identifiant est déjà utilisé.'}, status=400)
+
+    user = User.objects.create_user(username=username, email=email, password=password)
+    login(request, user)
+    return JsonResponse({'ok': True, 'username': user.username, 'is_staff': user.is_staff})

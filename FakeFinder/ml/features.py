@@ -138,11 +138,11 @@ def prepare_email_text(parsed: dict) -> str:
     `parsed` is the dict returned by parse_eml_in_memory().
     """
     parts = [
-        parsed.get("subject", ""),
-        parsed.get("sender_email", ""),
-        parsed.get("sender_domain", ""),
-        parsed.get("body_text", ""),
-        " ".join(parsed.get("urls", [])),
+        str(parsed.get("subject", "") or ""),
+        str(parsed.get("sender_email", "") or ""),
+        str(parsed.get("sender_domain", "") or ""),
+        str(parsed.get("body_text", "") or ""),
+        " ".join(str(u) for u in parsed.get("urls", [])),
     ]
     return " ".join(p for p in parts if p)
 
@@ -151,14 +151,19 @@ def probability_to_verdict(proba: float) -> tuple:
     """
     Convert a phishing probability (0.0–1.0) to a risk label and 0-100 score.
 
+    Thresholds are intentionally conservative on the HIGH end:
+      - LOW    < 0.30  → clearly safe
+      - MEDIUM 0.30–0.72 → ambiguous, needs review
+      - HIGH   ≥ 0.72  → strong phishing signal
+
     Returns:
         (risk_score: str, score: int)
         risk_score is one of: 'LOW', 'MEDIUM', 'HIGH'
     """
     score = round(proba * 100)
-    if proba < 0.35:
+    if proba < 0.30:
         return "LOW", score
-    elif proba < 0.68:
+    elif proba < 0.72:
         return "MEDIUM", score
     else:
         return "HIGH", score

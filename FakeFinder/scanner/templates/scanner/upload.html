@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>Fake Finder – Détecteur de phishing</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -101,24 +102,24 @@
     <!-- Nav -->
     <nav class="hidden md:flex items-center gap-0.5">
       <button data-nav="home"    onclick="goTo('home')"    class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Analyser</button>
-      <button data-nav="history" onclick="goTo('history')" id="nav-history" class="nav-btn rounded-lg px-3.5 py-2 text-[13px] hidden">Historique</button>
-      <button data-nav="admin"   onclick="goTo('admin')"   id="nav-admin"   class="nav-btn rounded-lg px-3.5 py-2 text-[13px] hidden">Admin</button>
+      <button data-nav="history" onclick="goTo('history')" id="nav-history" class="nav-btn rounded-lg px-3.5 py-2 text-[13px] {% if not user.is_authenticated %}hidden{% endif %}">Historique</button>
+      {% if user.is_staff %}<button data-nav="admin" onclick="goTo('admin')" id="nav-admin" class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Admin</button>{% endif %}
     </nav>
 
     <!-- Auth -->
     <div class="flex items-center gap-1.5">
       <!-- logged-out -->
-      <div id="auth-out" class="flex items-center gap-1.5">
+      <div id="auth-out" class="{% if user.is_authenticated %}hidden{% else %}flex{% endif %} items-center gap-1.5">
         <button onclick="goTo('login')"    class="rounded-lg px-3.5 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Connexion</button>
         <button onclick="goTo('register')" class="rounded-lg bg-brand-500 px-3.5 py-2 text-[13px] font-semibold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600 transition-colors">Inscription</button>
       </div>
       <!-- logged-in -->
-      <div id="auth-in" class="hidden items-center gap-2">
+      <div id="auth-in" class="{% if user.is_authenticated %}flex{% else %}hidden{% endif %} items-center gap-2">
         <span class="hidden md:inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-[12px] text-slate-300">
           <span class="h-1.5 w-1.5 rounded-full bg-verdict-safe animate-pulse"></span>
-          <span id="logged-name">utilisateur</span>
+          <span id="logged-name">{{ user.username }}</span>
         </span>
-        <button onclick="demoLogout()" class="rounded-lg px-3 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Déconnexion</button>
+        <button onclick="realLogout()" class="rounded-lg px-3 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Déconnexion</button>
       </div>
     </div>
 
@@ -163,24 +164,25 @@
 
     <!-- Upload card -->
     <div class="mx-auto max-w-2xl space-y-4">
-      <form id="upload-form" method="POST" action="/" enctype="multipart/form-data">
+      <form id="upload-form" method="POST" action="{% url 'upload_email' %}" enctype="multipart/form-data">
         {% csrf_token %}
 
         <!-- Drop zone -->
         <div id="drop-zone"
              class="rounded-2xl border-2 border-dashed border-white/15 bg-ink-900/60 p-10 text-center cursor-pointer transition-all duration-200 hover:border-brand-500/35 hover:bg-brand-500/5 grid-bg select-none">
 
-          <!-- Upload icon -->
-          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/25">
-            <svg id="dz-icon" class="h-7 w-7 text-brand-400 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
+          <!-- Initial prompt (hidden once a file is selected) -->
+          <div id="dz-prompt">
+            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/25">
+              <svg class="h-7 w-7 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <p class="mt-5 text-[15px] font-semibold">Déposez votre fichier <code class="font-mono text-brand-400">.eml</code></p>
+            <p class="mt-1 text-sm text-slate-500">ou cliquez pour parcourir vos fichiers</p>
           </div>
-
-          <p class="mt-5 text-[15px] font-semibold">Déposez votre fichier <code class="font-mono text-brand-400">.eml</code></p>
-          <p class="mt-1 text-sm text-slate-500">ou cliquez pour parcourir vos fichiers</p>
 
           <!-- Hidden input -->
           <input id="eml-input" type="file" name="eml_file" accept=".eml" class="hidden">
@@ -209,11 +211,13 @@
 
         <p id="upload-error" class="hidden text-center text-xs text-verdict-danger"></p>
 
+        {% if not user.is_authenticated %}
         <p class="text-center text-xs text-slate-600">
           Aucune connexion requise.
           <button type="button" onclick="goTo('login')" class="text-slate-500 hover:text-slate-400 underline underline-offset-2">Connectez-vous</button>
           pour conserver votre historique.
         </p>
+        {% endif %}
       </form>
     </div>
 
@@ -245,164 +249,6 @@
   </section><!-- /home -->
 
 
-  <!-- ══ RESULT ══ -->
-  <section id="result" data-section class="hidden py-10 space-y-6">
-
-    <!-- Back + title -->
-    <div class="flex items-center gap-4 flex-wrap">
-      <button onclick="goTo('home')" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
-        Retour
-      </button>
-      <div>
-        <h2 class="text-2xl font-bold tracking-tight">Résultat de l'analyse</h2>
-        <p class="text-sm text-slate-500 font-mono mt-0.5">facture-orange-2024.eml</p>
-      </div>
-    </div>
-
-    <!-- Verdict banner -->
-    <div class="rounded-2xl border border-verdict-danger/25 bg-gradient-to-r from-verdict-danger/12 to-transparent p-5 flex items-center gap-4">
-      <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-verdict-danger/20 text-verdict-danger font-black text-lg">!</div>
-      <div>
-        <p class="text-xs uppercase tracking-widest font-bold text-verdict-danger">Phishing détecté</p>
-        <p class="text-sm text-slate-300 mt-0.5">Cet email présente plusieurs signaux clairs de tentative de phishing. Ne cliquez sur aucun lien.</p>
-      </div>
-    </div>
-
-    <!-- Score + details -->
-    <div class="grid gap-5 lg:grid-cols-3">
-
-      <!-- Score card -->
-      <div class="rounded-2xl border border-verdict-danger/25 bg-gradient-to-b from-verdict-danger/12 to-ink-900/80 p-6 flex flex-col gap-5">
-        <div class="flex items-center justify-between">
-          <span class="badge badge-danger">
-            <span class="h-1.5 w-1.5 rounded-full bg-verdict-danger animate-pulse"></span>
-            DANGER
-          </span>
-          <span class="font-mono text-[11px] text-slate-500">score / 100</span>
-        </div>
-        <div class="text-center py-2">
-          <div class="text-6xl font-black tabular-nums text-verdict-danger leading-none">87</div>
-          <div class="text-xs text-slate-500 mt-2 uppercase tracking-wider">Risque élevé</div>
-        </div>
-        <!-- Progress bar -->
-        <div>
-          <div class="h-2 w-full overflow-hidden rounded-full bg-white/5">
-            <div class="h-full rounded-full bg-gradient-to-r from-verdict-warn to-verdict-danger" style="width:87%; transition:width 1s ease"></div>
-          </div>
-          <div class="mt-1.5 flex justify-between font-mono text-[10px] text-slate-600">
-            <span>SAFE</span><span>SUSPECT</span><span>DANGER</span>
-          </div>
-        </div>
-        <!-- Meta -->
-        <div class="border-t border-white/5 pt-4 space-y-2 text-xs">
-          <div class="flex justify-between">
-            <span class="text-slate-500">Analysé le</span>
-            <span class="font-mono text-slate-300">09 mai 2026</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-slate-500">Durée</span>
-            <span class="font-mono text-slate-300">0.24 s</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Details card -->
-      <div class="lg:col-span-2 rounded-2xl border border-white/10 bg-ink-900/60 p-6 space-y-5">
-        <h3 class="text-sm font-semibold text-slate-200">Indices détectés</h3>
-        <ul class="space-y-2.5 text-sm">
-          <li class="flex gap-3 rounded-xl border border-verdict-danger/20 bg-verdict-danger/5 p-3.5">
-            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-danger/20 text-verdict-danger text-[11px] font-black">!</span>
-            <div>
-              <p class="font-semibold text-slate-100">Domaine expéditeur usurpé</p>
-              <p class="text-slate-400 mt-0.5">Le champ <code class="font-mono text-slate-300">From</code> imite "orange.fr" mais provient de <code class="font-mono text-verdict-danger">orang3-billing.xyz</code>.</p>
-            </div>
-          </li>
-          <li class="flex gap-3 rounded-xl border border-verdict-danger/20 bg-verdict-danger/5 p-3.5">
-            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-danger/20 text-verdict-danger text-[11px] font-black">!</span>
-            <div>
-              <p class="font-semibold text-slate-100">SPF / DKIM / DMARC en échec</p>
-              <p class="text-slate-400 mt-0.5">Les trois mécanismes d'authentification ont échoué pour ce domaine.</p>
-            </div>
-          </li>
-          <li class="flex gap-3 rounded-xl border border-verdict-warn/20 bg-verdict-warn/5 p-3.5">
-            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-warn/20 text-verdict-warn text-[11px] font-black">!</span>
-            <div>
-              <p class="font-semibold text-slate-100">Lien raccourci suspect</p>
-              <p class="text-slate-400 mt-0.5"><code class="font-mono text-slate-300">bit.ly/3xQ-pay</code> redirige vers un domaine inconnu.</p>
-            </div>
-          </li>
-          <li class="flex gap-3 rounded-xl border border-verdict-warn/20 bg-verdict-warn/5 p-3.5">
-            <span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-verdict-warn/20 text-verdict-warn text-[11px] font-black">!</span>
-            <div>
-              <p class="font-semibold text-slate-100">Pression à l'urgence</p>
-              <p class="text-slate-400 mt-0.5">Mots-clés "suspension immédiate", "24h", "vérifier maintenant" détectés.</p>
-            </div>
-          </li>
-        </ul>
-        <!-- Email meta -->
-        <div class="grid sm:grid-cols-2 gap-3 border-t border-white/5 pt-5 text-sm">
-          <div>
-            <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Expéditeur</p>
-            <p class="font-mono text-[13px] text-verdict-danger">facturation@orang3-billing.xyz</p>
-          </div>
-          <div>
-            <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Destinataire</p>
-            <p class="font-mono text-[13px] text-slate-300">utilisateur@exemple.com</p>
-          </div>
-          <div class="sm:col-span-2">
-            <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Sujet</p>
-            <p class="text-slate-200">Votre facture est en attente — suspension dans 24h</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Verdict scale -->
-    <div class="grid gap-3 sm:grid-cols-3">
-      <div class="rounded-xl border border-verdict-safe/20 bg-verdict-safe/8 p-4">
-        <div class="flex items-center justify-between mb-2.5">
-          <span class="badge badge-safe"><span class="h-1.5 w-1.5 rounded-full bg-verdict-safe"></span> SAFE</span>
-          <span class="font-mono text-[11px] text-slate-500">0 – 33</span>
-        </div>
-        <p class="text-sm text-slate-200">Aucun signe de phishing détecté.</p>
-        <p class="text-xs text-slate-500 mt-0.5">Authentification OK, expéditeur connu.</p>
-      </div>
-      <div class="rounded-xl border border-verdict-warn/20 bg-verdict-warn/8 p-4">
-        <div class="flex items-center justify-between mb-2.5">
-          <span class="badge badge-warn"><span class="h-1.5 w-1.5 rounded-full bg-verdict-warn"></span> SUSPECT</span>
-          <span class="font-mono text-[11px] text-slate-500">34 – 66</span>
-        </div>
-        <p class="text-sm text-slate-200">Quelques signaux ambigus détectés.</p>
-        <p class="text-xs text-slate-500 mt-0.5">Vérifiez avant de cliquer ou répondre.</p>
-      </div>
-      <div class="rounded-xl border border-verdict-danger/25 bg-verdict-danger/8 ring-1 ring-verdict-danger/15 p-4">
-        <div class="flex items-center justify-between mb-2.5">
-          <span class="badge badge-danger"><span class="h-1.5 w-1.5 rounded-full bg-verdict-danger animate-pulse"></span> DANGER</span>
-          <span class="font-mono text-[11px] text-slate-500">67 – 100</span>
-        </div>
-        <p class="text-sm text-slate-200">Phishing très probable.</p>
-        <p class="text-xs text-slate-500 mt-0.5">Ne cliquez sur aucun lien, supprimez l'email.</p>
-      </div>
-    </div>
-
-    <!-- Actions -->
-    <div class="flex flex-wrap gap-3">
-      <button onclick="goTo('home')"
-              class="flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-bold text-white shadow-xl shadow-brand-500/20 hover:bg-brand-600 transition-colors">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 18 0A9 9 0 0 0 3 12"/><polyline points="3 12 7 12"/><polyline points="12 3 12 7"/></svg>
-        Nouvelle analyse
-      </button>
-      <button onclick="goTo('history')"
-              class="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors">
-        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-        Voir l'historique
-      </button>
-    </div>
-
-  </section><!-- /result -->
-
-
   <!-- ══ HISTORY ══ -->
   <section id="history" data-section class="hidden py-10 space-y-6">
 
@@ -411,7 +257,7 @@
         <h2 class="text-2xl font-bold tracking-tight">Mon historique</h2>
         <p class="text-sm text-slate-400">Les analyses associées à votre compte.</p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <div class="relative">
           <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           <input id="h-search" type="text" oninput="filterHistory()" placeholder="Rechercher…"
@@ -424,6 +270,11 @@
           <option value="SUSPECT">Suspect</option>
           <option value="DANGER">Danger</option>
         </select>
+        <button onclick="deleteAllReports()"
+                class="flex items-center gap-1.5 rounded-xl border border-verdict-danger/30 bg-verdict-danger/10 px-3 py-2 text-xs font-medium text-verdict-danger hover:bg-verdict-danger/20 transition-colors">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Tout supprimer
+        </button>
       </div>
     </div>
 
@@ -431,19 +282,19 @@
     <div class="grid gap-3 grid-cols-2 sm:grid-cols-4">
       <div class="rounded-xl border border-white/10 bg-ink-900/60 p-4">
         <p class="text-[10px] uppercase tracking-wider text-slate-500">Total</p>
-        <p class="mt-1 text-2xl font-bold">4</p>
+        <p id="h-stat-total" class="mt-1 text-2xl font-bold">{{ total_scans|default:0 }}</p>
       </div>
       <div class="rounded-xl border border-verdict-safe/20 bg-verdict-safe/8 p-4">
         <p class="text-[10px] uppercase tracking-wider text-verdict-safe">Safe</p>
-        <p class="mt-1 text-2xl font-bold text-verdict-safe">1</p>
+        <p id="h-stat-safe" class="mt-1 text-2xl font-bold text-verdict-safe">{{ safe_count|default:0 }}</p>
       </div>
       <div class="rounded-xl border border-verdict-warn/20 bg-verdict-warn/8 p-4">
         <p class="text-[10px] uppercase tracking-wider text-verdict-warn">Suspect</p>
-        <p class="mt-1 text-2xl font-bold text-verdict-warn">1</p>
+        <p id="h-stat-suspect" class="mt-1 text-2xl font-bold text-verdict-warn">{{ suspect_count|default:0 }}</p>
       </div>
       <div class="rounded-xl border border-verdict-danger/20 bg-verdict-danger/8 p-4">
         <p class="text-[10px] uppercase tracking-wider text-verdict-danger">Danger</p>
-        <p class="mt-1 text-2xl font-bold text-verdict-danger">2</p>
+        <p id="h-stat-danger" class="mt-1 text-2xl font-bold text-verdict-danger">{{ danger_count|default:0 }}</p>
       </div>
     </div>
 
@@ -461,38 +312,40 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-white/5" id="h-tbody">
-          <tr data-verdict="DANGER" class="hover:bg-white/5 transition-colors cursor-pointer">
-            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">facture-orange.eml</td>
-            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">facturation@orang3-billing.xyz</td>
-            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">Votre facture est en attente</td>
-            <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
-            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
-            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
-          </tr>
-          <tr data-verdict="SUSPECT" class="hover:bg-white/5 transition-colors cursor-pointer">
-            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">colis-laposte.eml</td>
-            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">noreply@laposte-suivi.co</td>
-            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">Votre colis n'a pas pu être livré</td>
-            <td class="px-4 py-3.5"><span class="badge badge-warn">SUSPECT</span></td>
-            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">28 avr. 2026</td>
-            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
-          </tr>
-          <tr data-verdict="SAFE" class="hover:bg-white/5 transition-colors cursor-pointer">
-            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">newsletter.eml</td>
-            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">hello@vercel.com</td>
-            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">What's new in v0</td>
-            <td class="px-4 py-3.5"><span class="badge badge-safe">SAFE</span></td>
-            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">26 avr. 2026</td>
-            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
-          </tr>
-          <tr data-verdict="DANGER" class="hover:bg-white/5 transition-colors cursor-pointer">
-            <td class="px-4 py-3.5 font-mono text-xs text-slate-300">banque-alerte.eml</td>
-            <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">securite@bnp-verif.click</td>
-            <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">Activité suspecte sur votre compte</td>
-            <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
-            <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">22 avr. 2026</td>
-            <td class="px-4 py-3.5 text-right"><button onclick="showDemoResult()" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</button></td>
-          </tr>
+          {% if user_history %}
+            {% for report in user_history %}
+              {% with meta=report.header_anomalies.0 %}
+              <tr data-verdict="{% if report.risk_score == 'HIGH' %}DANGER{% elif report.risk_score == 'MEDIUM' %}SUSPECT{% else %}SAFE{% endif %}"
+                  class="hover:bg-white/5 transition-colors cursor-pointer">
+                <td class="px-4 py-3.5 font-mono text-xs text-slate-300">{{ meta.filename|default:"email.eml" }}</td>
+                <td class="px-4 py-3.5 text-xs text-slate-400 hidden sm:table-cell">{{ meta.sender_email|default:"—" }}</td>
+                <td class="px-4 py-3.5 text-xs text-slate-300 hidden md:table-cell">{{ meta.subject|default:"—" }}</td>
+                <td class="px-4 py-3.5">
+                  {% if report.risk_score == 'HIGH' %}
+                    <span class="badge badge-danger">DANGER</span>
+                  {% elif report.risk_score == 'MEDIUM' %}
+                    <span class="badge badge-warn">SUSPECT</span>
+                  {% else %}
+                    <span class="badge badge-safe">SAFE</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">{{ report.created_at|date:"d M Y" }}</td>
+                <td class="px-4 py-3.5 text-right">
+                  <div class="flex items-center justify-end gap-3">
+                    <a href="{% url 'report_detail' report.id %}" class="text-xs text-brand-400 hover:text-brand-300 transition-colors">Voir →</a>
+                    <button onclick="deleteReport({{ report.id }}, this)" class="text-xs text-slate-600 hover:text-verdict-danger transition-colors" title="Supprimer">
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M9 6V4h6v2"/></svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              {% endwith %}
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Aucune analyse pour le moment.</td>
+            </tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
@@ -625,11 +478,12 @@
             <input id="login-pw" type="password" placeholder="••••••••"
                    class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 pr-11 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
             <button type="button" onclick="togglePw('login-pw',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle fill="none" cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
         </div>
-        <button onclick="demoLogin()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors">
+        <p id="login-error" class="hidden text-xs text-verdict-danger text-center"></p>
+        <button onclick="realLogin()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors">
           Se connecter
         </button>
         <div class="text-center text-xs text-slate-500 space-y-1.5">
@@ -657,12 +511,12 @@
       <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-8 space-y-4">
         <div>
           <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Identifiant</label>
-          <input type="text" placeholder="choisissez un identifiant"
+          <input id="reg-user" type="text" placeholder="choisissez un identifiant"
                  class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
         </div>
         <div>
           <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Email</label>
-          <input type="email" placeholder="vous@exemple.com"
+          <input id="reg-email" type="email" placeholder="vous@exemple.com"
                  class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
         </div>
         <div>
@@ -671,16 +525,17 @@
             <input id="reg-pw" type="password" placeholder="Au moins 8 caractères"
                    class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 pr-11 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
             <button type="button" onclick="togglePw('reg-pw',this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle fill="none" cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
         </div>
         <div>
           <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Confirmer</label>
-          <input type="password" placeholder="Répétez le mot de passe"
+          <input id="reg-confirm" type="password" placeholder="Répétez le mot de passe"
                  class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/25 transition-colors">
         </div>
-        <button onclick="demoLogin()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors mt-2">
+        <p id="reg-error" class="hidden text-xs text-verdict-danger text-center"></p>
+        <button onclick="realRegister()" class="w-full rounded-xl bg-brand-500 py-3 text-sm font-bold text-white shadow-xl shadow-brand-500/25 hover:bg-brand-600 transition-colors mt-2">
           Créer mon compte
         </button>
         <p class="text-center text-xs text-slate-500">
@@ -706,20 +561,48 @@
 </footer>
 
 
+<!-- ════════════════════ CONFIRM MODAL ════════════════════ -->
+<div id="confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+  <div class="w-full max-w-sm rounded-2xl border border-white/10 bg-ink-900 p-6 shadow-2xl">
+    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-verdict-danger/15 text-verdict-danger mx-auto mb-4">
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+      </svg>
+    </div>
+    <h3 id="confirm-title" class="text-center text-[15px] font-bold text-slate-100 mb-1">Confirmer</h3>
+    <p  id="confirm-msg"   class="text-center text-sm text-slate-400 mb-6 leading-relaxed"></p>
+    <div class="flex gap-3">
+      <button id="confirm-cancel"
+              class="flex-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors">
+        Annuler
+      </button>
+      <button id="confirm-ok"
+              class="flex-1 rounded-xl bg-verdict-danger py-2.5 text-sm font-bold text-white hover:bg-red-600 transition-colors">
+        Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════════ SCRIPTS ════════════════════ -->
 <script>
   // ─── Router ────────────────────────────────────────────────────────────────
-  const SECTIONS = document.querySelectorAll('[data-section]');
-  const NAV_BTNS = document.querySelectorAll('[data-nav]');
+  const SECTIONS        = document.querySelectorAll('[data-section]');
+  const NAV_BTNS        = document.querySelectorAll('[data-nav]');
+  const IS_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
 
   function goTo(id) {
+    // Guard: protected sections require authentication
+    if ((id === 'history' || id === 'admin') && !IS_AUTHENTICATED) {
+      id = 'login';
+    }
     SECTIONS.forEach(s => {
       const active = s.id === id;
       s.classList.toggle('hidden', !active);
       if (active) {
         s.classList.remove('fade-in');
-        // Force reflow so animation re-triggers
-        void s.offsetWidth;
+        void s.offsetWidth; // Force reflow so animation re-triggers
         s.classList.add('fade-in');
       }
     });
@@ -731,31 +614,96 @@
   // Init from hash or default
   goTo(location.hash.slice(1) || 'home');
 
-  // ─── Demo auth ─────────────────────────────────────────────────────────────
-  function demoLogin() {
-    const name = document.getElementById('login-user')?.value?.trim() || 'utilisateur';
-    document.getElementById('auth-out').classList.add('hidden');
-    const authIn = document.getElementById('auth-in');
-    authIn.classList.remove('hidden');
-    authIn.classList.add('flex');
-    document.getElementById('logged-name').textContent = name;
-    document.getElementById('nav-history').classList.remove('hidden');
-    document.getElementById('nav-admin').classList.remove('hidden');
-    goTo('home');
+  // ─── Auth (real Django) ────────────────────────────────────────────────────
+  function getCsrfToken() {
+    const name = 'csrftoken=';
+    for (const part of document.cookie.split(';')) {
+      const c = part.trim();
+      if (c.startsWith(name)) return decodeURIComponent(c.slice(name.length));
+    }
+    return '';
   }
 
-  function demoLogout() {
-    const authIn = document.getElementById('auth-in');
-    authIn.classList.add('hidden');
-    authIn.classList.remove('flex');
-    document.getElementById('auth-out').classList.remove('hidden');
-    document.getElementById('nav-history').classList.add('hidden');
-    document.getElementById('nav-admin').classList.add('hidden');
-    goTo('home');
+  async function realLogin() {
+    const username = document.getElementById('login-user').value.trim();
+    const password = document.getElementById('login-pw').value;
+    const errEl    = document.getElementById('login-error');
+    errEl.classList.add('hidden');
+    try {
+      const resp = await fetch('/login/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.ok) {
+        window.location.href = '/';
+      } else {
+        errEl.textContent = data.error || 'Erreur de connexion (' + resp.status + ').';
+        errEl.classList.remove('hidden');
+      }
+    } catch {
+      errEl.textContent = 'Erreur réseau, réessayez.';
+      errEl.classList.remove('hidden');
+    }
   }
 
-  // ─── Demo result ───────────────────────────────────────────────────────────
-  function showDemoResult() { goTo('result'); }
+  async function realLogout() {
+    await fetch('/logout/', { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() } });
+    window.location.href = '/';
+  }
+
+  async function realRegister() {
+    const username = document.getElementById('reg-user').value.trim();
+    const email    = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-pw').value;
+    const confirm  = document.getElementById('reg-confirm').value;
+    const errEl    = document.getElementById('reg-error');
+    errEl.classList.add('hidden');
+    try {
+      const resp = await fetch('/register/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+        body: JSON.stringify({ username, email, password, confirm }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.ok) {
+        window.location.href = '/';
+      } else {
+        errEl.textContent = data.error || 'Erreur lors de l\'inscription (' + resp.status + ').';
+        errEl.classList.remove('hidden');
+      }
+    } catch {
+      errEl.textContent = 'Erreur réseau, réessayez.';
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  // ─── Confirm modal ─────────────────────────────────────────────────────────
+  function showConfirm(title, message) {
+    return new Promise(resolve => {
+      const modal     = document.getElementById('confirm-modal');
+      const okBtn     = document.getElementById('confirm-ok');
+      const cancelBtn = document.getElementById('confirm-cancel');
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-msg').textContent   = message;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      function cleanup(result) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+      function onOk()     { cleanup(true);  }
+      function onCancel() { cleanup(false); }
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      modal.addEventListener('click', e => { if (e.target === modal) cleanup(false); }, { once: true });
+    });
+  }
 
   // ─── Drag & Drop ───────────────────────────────────────────────────────────
   const zone       = document.getElementById('drop-zone');
@@ -767,39 +715,81 @@
   const submitText = document.getElementById('submit-text');
   const errEl      = document.getElementById('upload-error');
   const clearBtn   = document.getElementById('clear-btn');
+  const dzPrompt   = document.getElementById('dz-prompt');
 
-  // Click on zone triggers file picker (except on buttons inside)
-  zone.addEventListener('click', e => {
-    if (e.target.closest('button')) return;
-    input.click();
-  });
+  // Click anywhere on the zone triggers the file picker.
+  // clearBtn has stopPropagation so its clicks never reach here.
+  zone.addEventListener('click', () => input.click());
 
-  // Prevent browser default drop behaviour on the whole page
+  // Prevent browser default drop on the whole page
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop',     e => e.preventDefault());
 
-  zone.addEventListener('dragenter', e => { e.preventDefault(); zone.classList.add('drop-active'); });
-  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drop-active'); });
-  zone.addEventListener('dragleave', ()  => zone.classList.remove('drop-active'));
-  zone.addEventListener('dragend',   ()  => zone.classList.remove('drop-active'));
+  // Counter prevents dragleave firing on child elements causing flicker
+  let dragCounter = 0;
+  zone.addEventListener('dragenter', e => { e.preventDefault(); dragCounter++; zone.classList.add('drop-active'); });
+  zone.addEventListener('dragover',  e => { e.preventDefault(); });
+  zone.addEventListener('dragleave', () => { if (--dragCounter <= 0) { dragCounter = 0; zone.classList.remove('drop-active'); } });
+  zone.addEventListener('dragend',   () => { dragCounter = 0; zone.classList.remove('drop-active'); });
+
   zone.addEventListener('drop', e => {
     e.preventDefault();
+    dragCounter = 0;
     zone.classList.remove('drop-active');
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    const files = e.dataTransfer.files;
+    // No file dropped (e.g. user dragged then cancelled) → keep current state
+    if (!files.length) return;
+    handleFile(files[0]);
   });
 
+  // Last successfully validated file — survives picker cancels and invalid drops.
+  let currentFile = null;
+
+  // Sync input.files to a given File object (no-op on Safari where files is read-only)
+  function assignToInput(file) {
+    try {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+    } catch { /* Safari: form will still submit via currentFile guard in submit handler */ }
+  }
+
+  // Restore input.files to currentFile, or clear it if no valid file exists
+  function restoreInputFiles() {
+    if (currentFile) {
+      assignToInput(currentFile);
+    } else {
+      try { input.value = ''; } catch {}
+    }
+  }
+
   input.addEventListener('change', () => {
-    if (input.files.length) handleFile(input.files[0]);
+    if (input.files && input.files.length > 0) {
+      handleFile(input.files[0]);
+    } else {
+      // Picker cancelled — restore input.files to the last valid file (may be null)
+      restoreInputFiles();
+    }
   });
 
   function handleFile(file) {
     if (!file.name.toLowerCase().endsWith('.eml')) {
       showErr('Seuls les fichiers .eml sont acceptés.');
+      restoreInputFiles(); // Keep input in sync with currentFile
       return;
     }
+    if (file.size > 10 * 1024 * 1024) {
+      showErr('Fichier trop volumineux (max 10 Mo).');
+      restoreInputFiles();
+      return;
+    }
+    // Validation passed — commit the new file
+    currentFile = file;
+    assignToInput(file);
     const kb = file.size / 1024;
     fileNameEl.textContent = file.name;
     fileSizeEl.textContent = kb > 1024 ? (kb / 1024).toFixed(1) + ' Mo' : Math.round(kb) + ' Ko';
+    dzPrompt.classList.add('hidden');
     preview.classList.remove('hidden');
     submitBtn.disabled = false;
     errEl.classList.add('hidden');
@@ -807,8 +797,10 @@
 
   clearBtn.addEventListener('click', e => {
     e.stopPropagation();
+    currentFile = null;
     input.value = '';
     preview.classList.add('hidden');
+    dzPrompt.classList.remove('hidden');
     submitBtn.disabled = true;
   });
 
@@ -818,8 +810,22 @@
     setTimeout(() => errEl.classList.add('hidden'), 4000);
   }
 
-  // Loading state on submit
-  document.getElementById('upload-form').addEventListener('submit', () => {
+  // Before submitting, ensure input.files is in sync with currentFile
+  // (some browsers clear input.files when the picker is opened then cancelled)
+  document.getElementById('upload-form').addEventListener('submit', e => {
+    if (currentFile && (!input.files || !input.files.length)) {
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(currentFile);
+        input.files = dt.files;
+      } catch {
+        e.preventDefault();
+        showErr('Erreur fichier. Veuillez resélectionner le fichier.');
+        submitBtn.disabled = false;
+        submitText.textContent = "Analyser l'email";
+        return;
+      }
+    }
     submitText.textContent = 'Analyse en cours…';
     submitBtn.disabled = true;
   });
@@ -835,9 +841,55 @@
     });
   }
 
+  // ─── History delete ────────────────────────────────────────────────────────
+  function updateHistoryStats() {
+    const rows = [...document.querySelectorAll('#h-tbody tr[data-verdict]')];
+    document.getElementById('h-stat-total').textContent  = rows.length;
+    document.getElementById('h-stat-safe').textContent   = rows.filter(r => r.dataset.verdict === 'SAFE').length;
+    document.getElementById('h-stat-suspect').textContent = rows.filter(r => r.dataset.verdict === 'SUSPECT').length;
+    document.getElementById('h-stat-danger').textContent  = rows.filter(r => r.dataset.verdict === 'DANGER').length;
+  }
+
+  async function deleteReport(id, btn) {
+    const ok = await showConfirm(
+      'Supprimer ce rapport',
+      'Le rapport sera définitivement supprimé. Cette action est irréversible.'
+    );
+    if (!ok) return;
+    const resp = await fetch(`/report/${id}/delete/`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    });
+    if (resp.ok) {
+      btn.closest('tr').remove();
+      const tbody = document.getElementById('h-tbody');
+      if (!tbody.querySelector('tr[data-verdict]')) {
+        tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Aucune analyse pour le moment.</td></tr>';
+      }
+      updateHistoryStats();
+    }
+  }
+
+  async function deleteAllReports() {
+    const ok = await showConfirm(
+      'Supprimer tout l\'historique',
+      'Tous vos rapports d\'analyse seront définitivement supprimés. Cette action est irréversible.'
+    );
+    if (!ok) return;
+    const resp = await fetch('/history/delete/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    });
+    if (resp.ok) {
+      document.getElementById('h-tbody').innerHTML =
+        '<tr><td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">Aucune analyse pour le moment.</td></tr>';
+      updateHistoryStats();
+    }
+  }
+
   // ─── Password show/hide ────────────────────────────────────────────────────
-  const EYE_OPEN  = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-  const EYE_SLASH = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  const EYE_OPEN  = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle fill="none" cx="12" cy="12" r="3"/></svg>';
+  const EYE_SLASH = '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 
   function togglePw(id, btn) {
     const inp = document.getElementById(id);

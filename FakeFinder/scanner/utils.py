@@ -1,7 +1,22 @@
 import email
 import re
+from email.header import decode_header as _decode_header
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+
+
+def _header_to_str(value) -> str:
+    """Decode an email header value (str or Header object) to a plain unicode string."""
+    if not value:
+        return ""
+    decoded_parts = _decode_header(str(value))
+    result = []
+    for raw, charset in decoded_parts:
+        if isinstance(raw, bytes):
+            result.append(raw.decode(charset or "utf-8", errors="replace"))
+        else:
+            result.append(raw)
+    return " ".join(result)
 
 
 def sanitize_url(url):
@@ -32,24 +47,27 @@ def parse_eml_in_memory(file_obj):
     """
     file_obj.seek(0, 2)
     if file_obj.tell() > MAX_FILE_SIZE:
-        raise ValueError("File too large")
+        raise ValueError("Fichier trop volumineux (max 10 Mo).")
     file_obj.seek(0)
 
-    header = file_obj.read(6)
+    # Read enough bytes to detect at least one RFC 2822 header field
+    header_sample = file_obj.read(512)
     file_obj.seek(0)
-    if not (header.startswith(b"From:") or b"\nFrom:" in header):
-        raise ValueError("Invalid email format")
+    if not re.search(rb'(?i)(from|to|subject|mime-version|received|date|content-type|message-id)\s*:', header_sample):
+        raise ValueError("Format email invalide.")
     # 1. Read the file completely in memory
     msg = email.message_from_bytes(file_obj.read())
 
-    # 2. Extract Sender Domain
-    sender = msg.get("From", "")
+    # 2. Extract Sender Domain, full email address, and Subject
+    sender  = _header_to_str(msg.get("From", ""))
+    subject = _header_to_str(msg.get("Subject", ""))
     sender_domain = ""
+    sender_email  = ""
     if "@" in sender:
-        # Extracts "badguy.com" from "Hacker <admin@badguy.com>"
-        domain_match = re.search(r"@([\w.-]+)", sender)
-        if domain_match:
-            sender_domain = domain_match.group(1).strip(">")
+        email_match = re.search(r"[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}", sender)
+        if email_match:
+            sender_email  = email_match.group(0)
+            sender_domain = sender_email.split("@", 1)[1]
 
     # 3. Extract the Body Text
     body_text = ""
@@ -86,6 +104,8 @@ def parse_eml_in_memory(file_obj):
 
     return {
         "sender_domain": sender_domain,
-        "body_text": body_text,
+        "sender_email":  sender_email,
+        "subject":       subject,
+        "body_text":     body_text,
         "urls": [url for url in (sanitize_url(url) for url in extracted_urls) if url],
     }
