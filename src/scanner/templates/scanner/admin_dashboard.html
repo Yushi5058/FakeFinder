@@ -1,0 +1,97 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard - FakeFinder</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; background: #f4f4f9; }
+        .stats { display: flex; gap: 2em; margin-bottom: 2em; }
+        .stat-card { background: white; padding: 1.5em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex: 1; text-align: center; }
+        .stat-card h3 { margin-top: 0; color: #555; }
+        .stat-card p { font-size: 2em; font-weight: bold; margin: 0; color: #333; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #333; color: white; }
+        tr:hover { background: #f9f9f9; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
+        .badge-HIGH { background: #ffebee; color: #c62828; }
+        .badge-MEDIUM { background: #fff3e0; color: #ef6c00; }
+        .badge-LOW { background: #e8f5e9; color: #2e7d32; }
+        .actions { margin-bottom: 1em; display: flex; gap: 10px; }
+        .btn { padding: 8px 16px; border-radius: 4px; text-decoration: none; color: white; background: #007bff; font-weight: bold; cursor: pointer; border: none; }
+        .btn-success { background: #28a745; }
+        .btn-danger { background: #dc3545; }
+        .nav { margin-bottom: 1em; }
+        .nav a { margin-right: 15px; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="{% url 'upload_email' %}">Upload</a>
+        <a href="{% url 'admin_dashboard' %}"><b>Dashboard</b></a>
+        <a href="{% url 'admin_user_list' %}">Users</a>
+        <a href="{% url 'logout' %}">Logout</a>
+    </div>
+
+    <h1>Admin Dashboard</h1>
+
+    <div class="stats">
+        <div class="stat-card">
+            <h3>Total Scans</h3>
+            <p>{{ stats.total_scans }}</p>
+        </div>
+        <div class="stat-card">
+            <h3>Phishing Detected</h3>
+            <p>{{ stats.phishing_detected }}</p>
+        </div>
+        <div class="stat-card">
+            <h3>Registered Users</h3>
+            <p>{{ stats.users_count }}</p>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="{% url 'export_reports_csv' %}" class="btn">Export CSV</a>
+        <form method="POST" action="{% url 'admin_train_model' %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success">Train Model Now</button>
+        </form>
+    </div>
+
+    <h2>Recent Scans</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>User</th>
+                <th>Score</th>
+                <th>Risk</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for report in reports %}
+            <tr>
+                <td>{{ report.id }}</td>
+                <td>{{ report.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ report.user.username|default:"Anonymous" }}</td>
+                <td>{{ report.score }}/100</td>
+                <td><span class="badge badge-{{ report.risk_score }}">{{ report.risk_score }}</span></td>
+                <td>
+                    <a href="{% url 'report_detail' report.id %}">View</a> |
+                    <form method="POST" action="{% url 'admin_delete_report' report.id %}" style="display:inline;" onsubmit="return confirm('Delete this report?');">
+                        {% csrf_token %}
+                        <button type="submit" style="background:none; border:none; color:#dc3545; cursor:pointer; padding:0; font:inherit;">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align:center;">No reports found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

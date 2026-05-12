@@ -2,6 +2,9 @@ import json
 import re
 import time
 import logging
+import csv
+import sys
+import subprocess
 from pathlib import Path
 
 import joblib
@@ -45,10 +48,60 @@ def admin_user_list(request):
     """Admin-only view to see list of registered users."""
     users = User.objects.all().order_by('-date_joined')
     return render(request, "scanner/admin_users.html", {"users": users})
+
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def export_reports_csv(request):
+    """Export all scan reports to a CSV file."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="scan_reports.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['ID', 'Created At', 'User', 'Risk Score', 'Score', 'URLs Count'])
+
+    reports = ScanReport.objects.select_related('user').all().order_by('-created_at')
+    for r in reports:
+        writer.writerow([
+            r.id,
+            r.created_at.strftime('%Y-%m-%d %H:%M'),
+            r.user.username if r.user else 'Anonymous',
+            r.risk_score,
+            r.score,
+            len(r.suspicious_urls)
+        ])
+
+    return response
+
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+@require_POST
+def admin_train_model(request):
+    """Trigger ML model training."""
+    try:
+        # Run training script
+        cmd = [
+            sys.executable,  # Uses the current venv python
+            str(settings.BASE_DIR / "ml" / "train.py"),
+            "--data", str(settings.BASE_DIR / "ml" / "Phishing_Email.csv"),
+            "--out", str(settings.BASE_DIR / "ml" / "model.joblib")
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logger.info(f"Model trained successfully via admin panel: {result.stdout}")
+        
+        # Reload the model bundle in the process
+        global _model_bundle
+        _model_bundle = None # Force reload on next use
+        
+        return JsonResponse({'ok': True, 'message': 'Model trained successfully.'})
+    except Exception as e:
+        logger.error(f"Failed to train model via admin panel: {e}")
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.http import HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 

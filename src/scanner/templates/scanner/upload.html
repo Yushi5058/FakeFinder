@@ -103,7 +103,7 @@
     <nav class="hidden md:flex items-center gap-0.5">
       <button data-nav="home"    onclick="goTo('home')"    class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Analyser</button>
       <button data-nav="history" onclick="goTo('history')" id="nav-history" class="nav-btn rounded-lg px-3.5 py-2 text-[13px] {% if not user.is_authenticated %}hidden{% endif %}">Historique</button>
-      {% if user.is_staff %}<button data-nav="admin" onclick="goTo('admin')" id="nav-admin" class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Admin</button>{% endif %}
+      {% if user.is_staff %}<a href="{% url 'admin_dashboard' %}" class="nav-btn rounded-lg px-3.5 py-2 text-[13px] transition-colors hover:text-white">Admin</a>{% endif %}
     </nav>
 
     <!-- Auth -->
@@ -351,107 +351,6 @@
     </div>
 
   </section><!-- /history -->
-
-
-  <!-- ══ ADMIN ══ -->
-  <section id="admin" data-section class="hidden py-10 space-y-6">
-
-    <div class="flex items-center gap-3">
-      <h2 class="text-2xl font-bold tracking-tight">Espace administrateur</h2>
-      <span class="rounded-lg border border-brand-500/25 bg-brand-500/10 px-2 py-0.5 text-[11px] font-bold text-brand-400 uppercase tracking-widest">ADMIN</span>
-    </div>
-
-    <!-- Stats grid -->
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-5">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-[11px] uppercase tracking-wider text-slate-500">Total analyses</p>
-          <svg class="h-4 w-4 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
-        </div>
-        <p class="text-3xl font-bold">1 284</p>
-        <p class="mt-1 text-xs text-brand-400">+12 % cette semaine</p>
-      </div>
-      <div class="rounded-2xl border border-verdict-danger/20 bg-verdict-danger/8 p-5">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-[11px] uppercase tracking-wider text-slate-500">Phishing</p>
-          <svg class="h-4 w-4 text-verdict-danger/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.29 3.86-8.48 14.7A2 2 0 0 0 3.54 22h16.92a2 2 0 0 0 1.73-3.44L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
-        </div>
-        <p class="text-3xl font-bold text-verdict-danger">412</p>
-        <p class="mt-1 text-xs text-slate-500">32 % du total</p>
-      </div>
-      <div class="rounded-2xl border border-verdict-warn/20 bg-verdict-warn/8 p-5">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-[11px] uppercase tracking-wider text-slate-500">Suspects</p>
-          <svg class="h-4 w-4 text-verdict-warn/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
-        <p class="text-3xl font-bold text-verdict-warn">298</p>
-        <p class="mt-1 text-xs text-slate-500">23 % du total</p>
-      </div>
-      <div class="rounded-2xl border border-brand-500/20 bg-brand-500/8 p-5">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-[11px] uppercase tracking-wider text-slate-500">Utilisateurs</p>
-          <svg class="h-4 w-4 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87m-4-12a4 4 0 0 1 0 7.75"/></svg>
-        </div>
-        <p class="text-3xl font-bold">96</p>
-        <p class="mt-1 text-xs text-brand-400">+5 aujourd'hui</p>
-      </div>
-    </div>
-
-    <!-- All scans table -->
-    <div class="rounded-2xl border border-white/10 bg-ink-900/60 overflow-hidden">
-      <div class="flex items-center justify-between border-b border-white/5 px-5 py-4">
-        <h3 class="text-sm font-semibold">Toutes les analyses</h3>
-        <button class="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-white/10 transition-colors">
-          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Exporter CSV
-        </button>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
-            <tr>
-              <th class="px-4 py-3.5">Utilisateur</th>
-              <th class="px-4 py-3.5">Fichier</th>
-              <th class="px-4 py-3.5 hidden md:table-cell">Expéditeur</th>
-              <th class="px-4 py-3.5">Verdict</th>
-              <th class="px-4 py-3.5 hidden sm:table-cell">Date</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-white/5">
-            <tr class="hover:bg-white/5 transition-colors">
-              <td class="px-4 py-3.5 text-sm text-slate-300">marie@example.com</td>
-              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">facture-orange.eml</td>
-              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">facturation@orang3-billing.xyz</td>
-              <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
-              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
-            </tr>
-            <tr class="hover:bg-white/5 transition-colors">
-              <td class="px-4 py-3.5 text-sm text-slate-500 italic">anonyme</td>
-              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">paypal-confirm.eml</td>
-              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">service@paypaI-secure.com</td>
-              <td class="px-4 py-3.5"><span class="badge badge-danger">DANGER</span></td>
-              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">29 avr. 2026</td>
-            </tr>
-            <tr class="hover:bg-white/5 transition-colors">
-              <td class="px-4 py-3.5 text-sm text-slate-300">paul@example.com</td>
-              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">colis-laposte.eml</td>
-              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">noreply@laposte-suivi.co</td>
-              <td class="px-4 py-3.5"><span class="badge badge-warn">SUSPECT</span></td>
-              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">28 avr. 2026</td>
-            </tr>
-            <tr class="hover:bg-white/5 transition-colors">
-              <td class="px-4 py-3.5 text-sm text-slate-300">marie@example.com</td>
-              <td class="px-4 py-3.5 font-mono text-xs text-slate-400">newsletter.eml</td>
-              <td class="px-4 py-3.5 text-xs text-slate-400 hidden md:table-cell">hello@vercel.com</td>
-              <td class="px-4 py-3.5"><span class="badge badge-safe">SAFE</span></td>
-              <td class="px-4 py-3.5 text-xs text-slate-500 hidden sm:table-cell">26 avr. 2026</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-  </section><!-- /admin -->
 
 
   <!-- ══ LOGIN ══ -->

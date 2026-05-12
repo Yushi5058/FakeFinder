@@ -14,4 +14,6 @@ urlpatterns = [
     path("admin-panel/", views.admin_dashboard, name="admin_dashboard"),
     path("admin-panel/users/", views.admin_user_list, name="admin_user_list"),
     path("admin-panel/report/<int:report_id>/delete/", views.admin_delete_report, name="admin_delete_report"),
+    path("admin-panel/export-csv/", views.export_reports_csv, name="export_reports_csv"),
+    path("admin-panel/train-model/", views.admin_train_model, name="admin_train_model"),
 ]
