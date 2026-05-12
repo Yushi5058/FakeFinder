@@ -9,4 +9,9 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("logout/", views.logout_view, name="logout"),
     path("register/", views.register_view, name="register"),
+
+    # Admin routes
+    path("admin-panel/", views.admin_dashboard, name="admin_dashboard"),
+    path("admin-panel/users/", views.admin_user_list, name="admin_user_list"),
+    path("admin-panel/report/<int:report_id>/delete/", views.admin_delete_report, name="admin_delete_report"),
 ]
