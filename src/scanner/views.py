@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
+from django.views.decorators.http import require_POST
 ...
 @login_required
 @user_passes_test(lambda u: u.is_staff)

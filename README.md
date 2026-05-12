@@ -108,6 +108,10 @@ python manage.py runserver
 
 Access the application at `http://localhost:8000`
 
+### Admin Credentials (Local/Demo)
+- **Username**: `admin`
+- **Password**: `admin_password_2026`
+
 ## Usage
 
 1. Register an account or log in
