@@ -5,6 +5,8 @@ import logging
 import csv
 import sys
 import subprocess
+import tempfile
+import os
 from pathlib import Path
 
 import joblib
@@ -78,26 +80,47 @@ def export_reports_csv(request):
 @user_passes_test(lambda u: u.is_staff)
 @require_POST
 def admin_train_model(request):
-    """Trigger ML model training."""
+    """Trigger ML model training with optional dataset upload."""
+    dataset_file = request.FILES.get("dataset")
+    temp_path = None
+
     try:
+        data_path = str(settings.BASE_DIR / "ml" / "Phishing_Email.csv")
+
+        if dataset_file:
+            # Save uploaded CSV to a temporary file
+            ext = os.path.splitext(dataset_file.name)[1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+                for chunk in dataset_file.chunks():
+                    tmp.write(chunk)
+                temp_path = tmp.name
+            data_path = temp_path
+
         # Run training script
         cmd = [
-            sys.executable,  # Uses the current venv python
+            sys.executable,
             str(settings.BASE_DIR / "ml" / "train.py"),
-            "--data", str(settings.BASE_DIR / "ml" / "Phishing_Email.csv"),
+            "--data", data_path,
             "--out", str(settings.BASE_DIR / "ml" / "model.joblib")
         ]
+        
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         logger.info(f"Model trained successfully via admin panel: {result.stdout}")
         
-        # Reload the model bundle in the process
+        # Reset model bundle to force reload on next use
         global _model_bundle
-        _model_bundle = None # Force reload on next use
+        _model_bundle = None
         
-        return JsonResponse({'ok': True, 'message': 'Model trained successfully.'})
+        return JsonResponse({'ok': True, 'message': 'Modèle entraîné avec succès.'})
+
     except Exception as e:
         logger.error(f"Failed to train model via admin panel: {e}")
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+    
+    finally:
+        # Cleanup temp file
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email

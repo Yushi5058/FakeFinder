@@ -103,17 +103,28 @@
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Exporter CSV
         </a>
-        <form id="train-form" method="POST" action="{% url 'admin_train_model' %}">
-            {% csrf_token %}
-            <button type="submit" id="train-btn" class="flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600 transition-colors">
-              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v8"/><path d="m16 6-4 4-4-4"/><rect width="20" height="8" x="2" y="14" rx="2"/></svg>
-              Entraîner le modèle
-            </button>
-        </form>
     </div>
   </div>
 
-  <div id="train-msg" class="hidden mb-6 p-4 rounded-xl text-sm font-medium"></div>
+  <div class="mb-10 rounded-2xl border border-white/10 bg-ink-900/60 p-6 shadow-xl shadow-black/20">
+    <h2 class="text-xl font-bold tracking-tight mb-4">Gestion du Modèle ML</h2>
+    <form id="train-form" method="POST" action="{% url 'admin_train_model' %}" enctype="multipart/form-data" class="space-y-4">
+        {% csrf_token %}
+        <div class="flex flex-col sm:flex-row sm:items-end gap-4">
+            <div class="flex-1">
+                <label class="block text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-2">Nouveau dataset (.csv)</label>
+                <input type="file" name="dataset" accept=".csv"
+                       class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2 text-sm text-slate-100 focus:border-brand-500 focus:outline-none transition-colors">
+                <p class="mt-2 text-[10px] text-slate-600 italic">Si vide, le dataset par défaut (ml/Phishing_Email.csv) sera utilisé.</p>
+            </div>
+            <button type="submit" id="train-btn" class="flex items-center justify-center gap-1.5 rounded-xl bg-brand-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600 transition-colors disabled:opacity-50">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v8"/><path d="m16 6-4 4-4-4"/><rect width="20" height="8" x="2" y="14" rx="2"/></svg>
+              Re-entraîner le modèle
+            </button>
+        </div>
+    </form>
+    <div id="train-msg" class="hidden mt-6 p-4 rounded-xl text-sm font-medium"></div>
+  </div>
 
   <!-- Stats -->
   <div class="grid gap-4 sm:grid-cols-3 mb-10">
@@ -143,7 +154,7 @@
       <table class="w-full text-left text-sm">
         <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
           <tr>
-            <th class="px-6 py-4">Fichier</th>
+            <th class="px-6 py-4">ID</th>
             <th class="px-6 py-4">Utilisateur</th>
             <th class="px-6 py-4">Score</th>
             <th class="px-6 py-4">Verdict</th>
@@ -154,7 +165,7 @@
         <tbody class="divide-y divide-white/5">
           {% for report in reports %}
           <tr class="hover:bg-white/5 transition-colors">
-            <td class="px-6 py-4 font-mono text-xs text-slate-300">report_{{ report.id }}.eml</td>
+            <td class="px-6 py-4 font-mono text-xs text-slate-500">{{ report.id }}</td>
             <td class="px-6 py-4 text-slate-400">{{ report.user.username|default:"Anonyme" }}</td>
             <td class="px-6 py-4 font-bold text-slate-200">{{ report.score }}/100</td>
             <td class="px-6 py-4">
@@ -162,15 +173,12 @@
             </td>
             <td class="px-6 py-4 text-xs text-slate-500">{{ report.created_at|date:"d M Y H:i" }}</td>
             <td class="px-6 py-4 text-right">
-              <div class="flex items-center justify-end gap-3">
-                <a href="{% url 'report_detail' report.id %}" class="text-xs text-brand-400 hover:text-brand-300 font-bold transition-colors">Voir</a>
-                <form method="POST" action="{% url 'admin_delete_report' report.id %}" onsubmit="return confirm('Supprimer ce rapport ?');" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" class="text-xs text-slate-600 hover:text-verdict-danger transition-colors" title="Supprimer">
-                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                    </button>
-                </form>
-              </div>
+              <form method="POST" action="{% url 'admin_delete_report' report.id %}" onsubmit="return confirm('Supprimer ce rapport ?');" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="text-xs text-slate-600 hover:text-verdict-danger transition-colors" title="Supprimer">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+              </form>
             </td>
           </tr>
           {% empty %}
@@ -190,28 +198,31 @@
     trainForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         trainBtn.disabled = true;
-        trainBtn.innerHTML = "Entraînement...";
+        trainBtn.innerHTML = "Entraînement en cours...";
         trainMsg.classList.add('hidden');
+
+        const formData = new FormData(trainForm);
 
         try {
             const resp = await fetch("{% url 'admin_train_model' %}", {
                 method: 'POST',
-                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: formData
             });
             const data = await resp.json();
             if (data.ok) {
                 trainMsg.textContent = data.message;
-                trainMsg.className = "mb-6 p-4 rounded-xl text-sm font-medium bg-verdict-safe/10 text-verdict-safe border border-verdict-safe/20";
+                trainMsg.className = "mt-6 p-4 rounded-xl text-sm font-medium bg-verdict-safe/10 text-verdict-safe border border-verdict-safe/20";
             } else {
                 trainMsg.textContent = "Erreur: " + data.error;
-                trainMsg.className = "mb-6 p-4 rounded-xl text-sm font-medium bg-verdict-danger/10 text-verdict-danger border border-verdict-danger/20";
+                trainMsg.className = "mt-6 p-4 rounded-xl text-sm font-medium bg-verdict-danger/10 text-verdict-danger border border-verdict-danger/20";
             }
         } catch (err) {
             trainMsg.textContent = "Erreur réseau.";
-            trainMsg.className = "mb-6 p-4 rounded-xl text-sm font-medium bg-verdict-danger/10 text-verdict-danger border border-verdict-danger/20";
+            trainMsg.className = "mt-6 p-4 rounded-xl text-sm font-medium bg-verdict-danger/10 text-verdict-danger border border-verdict-danger/20";
         } finally {
             trainBtn.disabled = false;
-            trainBtn.innerHTML = "Entraîner le modèle";
+            trainBtn.innerHTML = "Re-entraîner le modèle";
             trainMsg.classList.remove('hidden');
         }
     });
