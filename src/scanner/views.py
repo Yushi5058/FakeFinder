@@ -7,6 +7,7 @@ from pathlib import Path
 import joblib
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -175,28 +176,23 @@ def upload_email(request):
     return render(request, "scanner/upload.html", context)
 
 
+@login_required
 def report_detail(request, report_id):
-    report = get_object_or_404(ScanReport, id=report_id)
-    # Reports owned by a user are private — only the owner may view them.
-    # Anonymous reports (user=None) remain accessible via direct link.
-    if report.user is not None and report.user != request.user:
-        return HttpResponseForbidden("Accès non autorisé.")
+    report = get_object_or_404(ScanReport, id=report_id, user=request.user)
     return render(request, "scanner/report.html", {"report": report})
 
 
+@login_required
 @require_POST
 def delete_report(request, report_id):
-    if not request.user.is_authenticated:
-        return JsonResponse({'ok': False}, status=403)
     report = get_object_or_404(ScanReport, id=report_id, user=request.user)
     report.delete()
     return JsonResponse({'ok': True})
 
 
+@login_required
 @require_POST
 def delete_all_reports(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'ok': False}, status=403)
     ScanReport.objects.filter(user=request.user).delete()
     return JsonResponse({'ok': True})
 
