@@ -199,6 +199,41 @@
   </div>
 </main>
 
+<!-- ════════════════════ FOOTER ════════════════════ -->
+<footer class="border-t border-white/5 py-6 mt-20">
+  <div class="mx-auto max-w-6xl px-6 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-2">
+      <svg class="h-3.5 w-3.5 text-brand-400/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/></svg>
+      <p class="text-xs text-slate-600">Fake Finder · Détecteur de phishing</p>
+    </div>
+    <p class="text-xs text-slate-700">Espace Administration · Audit & IA</p>
+  </div>
+</footer>
+
+<!-- ════════════════════ CONFIRM MODAL ════════════════════ -->
+<div id="confirm-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+  <div class="w-full max-w-sm rounded-2xl border border-white/10 bg-ink-900 p-6 shadow-2xl">
+    <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-verdict-danger/15 text-verdict-danger mx-auto mb-4">
+      <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+      </svg>
+    </div>
+    <h3 id="confirm-title" class="text-center text-[15px] font-bold text-slate-100 mb-1">Confirmer</h3>
+    <p  id="confirm-msg"   class="text-center text-sm text-slate-400 mb-6 leading-relaxed"></p>
+    <div class="flex gap-3">
+      <button id="confirm-cancel"
+              class="flex-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-slate-300 hover:bg-white/10 transition-colors">
+        Annuler
+      </button>
+      <button id="confirm-ok"
+              class="flex-1 rounded-xl bg-verdict-danger py-2.5 text-sm font-bold text-white hover:bg-red-600 transition-colors">
+        Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
     // ─── Shared Utilities ──────────────────────────────────────────────────
     function getCsrfToken() {
@@ -210,9 +245,53 @@
         return '';
     }
 
+    function showConfirm(title, message) {
+        return new Promise(resolve => {
+            const modal     = document.getElementById('confirm-modal');
+            const okBtn     = document.getElementById('confirm-ok');
+            const cancelBtn = document.getElementById('confirm-cancel');
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-msg').textContent   = message;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            function cleanup(result) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                resolve(result);
+            }
+            function onOk()     { cleanup(true);  }
+            function onCancel() { cleanup(false); }
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            modal.addEventListener('click', e => { if (e.target === modal) cleanup(false); }, { once: true });
+        });
+    }
+
+    function updateKPIs() {
+        const rows = [...document.querySelectorAll('tbody tr:not(#empty-row)')];
+        const kpiGrid = document.querySelector('.grid.sm\\:grid-cols-3');
+        if (!kpiGrid) return;
+        
+        const totalEl = kpiGrid.querySelector('.border-white\\/10 .text-4xl');
+        const phishingEl = kpiGrid.querySelector('.border-verdict-danger\\/20 .text-4xl');
+        
+        if (totalEl) totalEl.textContent = rows.length;
+        if (phishingEl) {
+            const highCount = rows.filter(r => r.querySelector('.badge-HIGH')).length;
+            phishingEl.textContent = highCount;
+        }
+    }
+
     // ─── AJAX Deletion ──────────────────────────────────────────────────────
     async function deleteReport(id, btn) {
-        if (!confirm('Supprimer ce rapport ?')) return;
+        const ok = await showConfirm(
+            'Supprimer ce rapport',
+            'Le rapport sera définitivement supprimé de la base de données.'
+        );
+        if (!ok) return;
         
         try {
             const resp = await fetch(`/admin-panel/report/${id}/delete/`, {
@@ -226,6 +305,7 @@
                 row.style.transform = 'translateX(10px)';
                 setTimeout(() => {
                     row.remove();
+                    updateKPIs();
                     const tbody = document.querySelector('tbody');
                     if (!tbody.querySelector('tr:not(#empty-row)')) {
                         tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-12 text-center text-slate-500" id="empty-row">Aucune analyse enregistrée.</td></tr>';
@@ -262,19 +342,25 @@
         progressBar.style.width = "0%";
         statusText.textContent = hasFile ? "Analyse et fusion du nouveau dataset..." : "Re-entraînement sur les données actuelles...";
         
-        let seconds = hasFile ? 12 : 8; // Adjust based on file presence
+        let seconds = hasFile ? 15 : 10; 
+        let currentSecond = 0;
         let total = seconds;
-        timerText.textContent = `~${seconds}s restantes`;
+        timerText.textContent = `~${total}s restantes`;
 
         const timer = setInterval(() => {
-            seconds--;
-            if (seconds > 0) {
-                timerText.textContent = `~${seconds}s restantes`;
-                const progress = ((total - seconds) / total) * 90;
+            currentSecond++;
+            let remaining = total - currentSecond;
+            if (remaining >= 0) {
+                timerText.textContent = `~${remaining}s restantes`;
+                // Logarithmic-ish progress: fast start, slow end to avoid 100% too early
+                const progress = (1 - Math.pow(0.85, currentSecond)) * 95; 
                 progressBar.style.width = progress + "%";
             }
-            if (seconds === Math.floor(total/2)) statusText.textContent = "Optimisation du modèle (Random Forest)...";
-            if (seconds === 2) statusText.textContent = "Calibration finale...";
+            
+            if (currentSecond === 2) statusText.textContent = "Extraction des caractéristiques textuelles...";
+            if (currentSecond === 5) statusText.textContent = "Optimisation du modèle (Random Forest)...";
+            if (currentSecond === 8) statusText.textContent = "Calibration des probabilités...";
+            if (remaining <= 2 && remaining > 0) statusText.textContent = "Finalisation de la sauvegarde...";
         }, 1000);
 
         const formData = new FormData(trainForm);
@@ -282,7 +368,7 @@
         try {
             const resp = await fetch("{% url 'admin_train_model' %}", {
                 method: 'POST',
-                headers: { 'X-CSRFToken': getCsrfToken() },
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
                 body: formData
             });
             const data = await resp.json();
