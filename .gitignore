@@ -62,7 +62,7 @@ db.sqlite3
 db.sqlite3-journal
 
 # ML model — too large for GitHub (>100 MB). Train locally with: python ml/train.py
-FakeFinder/ml/model.joblib
+src/ml/model.joblib
 
 # Flask stuff:
 instance/

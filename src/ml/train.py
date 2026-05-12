@@ -10,7 +10,7 @@ Kaggle "Phishing Email Detection" by Subhalaxmi Rout
 
 Usage
 -----
-From the FakeFinder/ directory (where manage.py lives):
+From the src/ directory (where manage.py lives):
 
     python ml/train.py --data ml/Phishing_Email.csv
 
