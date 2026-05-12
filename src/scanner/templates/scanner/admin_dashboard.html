@@ -117,7 +117,7 @@
                     <input type="file" name="dataset" accept=".csv"
                            class="w-full rounded-xl border border-white/10 bg-ink-800/60 px-4 py-2 text-sm text-slate-100 focus:border-brand-500 focus:outline-none transition-colors">
                 </div>
-                <p class="mt-2 text-[10px] text-slate-600 italic">Format requis: colonnes "Email Text" et "Email Type". Les nouvelles données seront fusionnées au dataset existant.</p>
+                <p class="mt-2 text-[10px] text-slate-600 italic">Format requis: colonnes de texte et d'étiquettes (détection automatique). Les nouvelles données seront fusionnées au dataset existant.</p>
             </div>
             <button type="submit" id="train-btn" class="flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
               <span id="btn-text">Re-entraîner le modèle</span>
@@ -127,7 +127,7 @@
         <!-- Progress UI -->
         <div id="progress-container" class="hidden space-y-3">
             <div class="flex items-center justify-between text-xs font-medium">
-                <span id="status-text" class="text-slate-400">Initialisation de l'entraînement...</span>
+                <span id="status-text" class="text-slate-400">Initialisation...</span>
                 <span id="timer-text" class="text-brand-400">~10s restantes</span>
             </div>
             <div class="h-2 w-full overflow-hidden rounded-full bg-white/5 ring-1 ring-white/10">
@@ -185,16 +185,13 @@
             </td>
             <td class="px-6 py-4 text-xs text-slate-500">{{ report.created_at|date:"d M Y H:i" }}</td>
             <td class="px-6 py-4 text-right">
-              <form method="POST" action="{% url 'admin_delete_report' report.id %}" onsubmit="return confirm('Supprimer ce rapport ?');" style="display:inline;">
-                  {% csrf_token %}
-                  <button type="submit" class="text-xs text-slate-600 hover:text-verdict-danger transition-colors" title="Supprimer">
-                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                  </button>
-              </form>
+              <button onclick="deleteReport({{ report.id }}, this)" class="text-xs text-slate-600 hover:text-verdict-danger transition-colors" title="Supprimer">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              </button>
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="6" class="px-6 py-12 text-center text-slate-500">Aucune analyse enregistrée.</td></tr>
+          <tr><td colspan="6" class="px-6 py-12 text-center text-slate-500" id="empty-row">Aucune analyse enregistrée.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -203,6 +200,46 @@
 </main>
 
 <script>
+    // ─── Shared Utilities ──────────────────────────────────────────────────
+    function getCsrfToken() {
+        const name = 'csrftoken=';
+        for (const part of document.cookie.split(';')) {
+            const c = part.trim();
+            if (c.startsWith(name)) return decodeURIComponent(c.slice(name.length));
+        }
+        return '';
+    }
+
+    // ─── AJAX Deletion ──────────────────────────────────────────────────────
+    async function deleteReport(id, btn) {
+        if (!confirm('Supprimer ce rapport ?')) return;
+        
+        try {
+            const resp = await fetch(`/admin-panel/report/${id}/delete/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCsrfToken() }
+            });
+            const data = await resp.json();
+            if (resp.ok && data.ok) {
+                const row = btn.closest('tr');
+                row.style.opacity = '0';
+                row.style.transform = 'translateX(10px)';
+                setTimeout(() => {
+                    row.remove();
+                    const tbody = document.querySelector('tbody');
+                    if (!tbody.querySelector('tr:not(#empty-row)')) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-12 text-center text-slate-500" id="empty-row">Aucune analyse enregistrée.</td></tr>';
+                    }
+                }, 300);
+            } else {
+                alert("Erreur lors de la suppression.");
+            }
+        } catch (err) {
+            alert("Erreur réseau.");
+        }
+    }
+
+    // ─── ML Training Pipeline ──────────────────────────────────────────────
     const trainForm = document.getElementById('train-form');
     const trainBtn  = document.getElementById('train-btn');
     const btnText   = document.getElementById('btn-text');
@@ -215,29 +252,28 @@
     trainForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
+        const hasFile = trainForm.querySelector('input[type="file"]').files.length > 0;
+        
         // UI Reset
         trainBtn.disabled = true;
         btnText.innerHTML = "Entraînement...";
         trainMsg.classList.add('hidden');
         progressContainer.classList.remove('hidden');
         progressBar.style.width = "0%";
-        statusText.textContent = "Chargement des données...";
+        statusText.textContent = hasFile ? "Analyse et fusion du nouveau dataset..." : "Re-entraînement sur les données actuelles...";
         
-        let seconds = 10;
+        let seconds = hasFile ? 12 : 8; // Adjust based on file presence
+        let total = seconds;
         timerText.textContent = `~${seconds}s restantes`;
 
-        // Fake progress animation
         const timer = setInterval(() => {
             seconds--;
             if (seconds > 0) {
                 timerText.textContent = `~${seconds}s restantes`;
-                // Progress up to 90%
-                const currentWidth = parseFloat(progressBar.style.width);
-                if (currentWidth < 90) {
-                    progressBar.style.width = (currentWidth + (90 / 10)) + "%";
-                }
+                const progress = ((total - seconds) / total) * 90;
+                progressBar.style.width = progress + "%";
             }
-            if (seconds === 5) statusText.textContent = "Optimisation du modèle (Random Forest)...";
+            if (seconds === Math.floor(total/2)) statusText.textContent = "Optimisation du modèle (Random Forest)...";
             if (seconds === 2) statusText.textContent = "Calibration finale...";
         }, 1000);
 
@@ -246,7 +282,7 @@
         try {
             const resp = await fetch("{% url 'admin_train_model' %}", {
                 method: 'POST',
-                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                headers: { 'X-CSRFToken': getCsrfToken() },
                 body: formData
             });
             const data = await resp.json();
@@ -259,6 +295,7 @@
                 statusText.textContent = "Entraînement réussi !";
                 trainMsg.textContent = data.message;
                 trainMsg.className = "mt-6 p-4 rounded-xl text-sm font-medium bg-verdict-safe/10 text-verdict-safe border-verdict-safe/20";
+                trainForm.reset();
             } else {
                 statusText.textContent = "Échec de l'entraînement.";
                 trainMsg.textContent = "Erreur: " + data.error;

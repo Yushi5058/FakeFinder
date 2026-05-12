@@ -59,6 +59,7 @@ def admin_train_model(request):
     """Append new data to dataset and trigger ML model training."""
     dataset_file = request.FILES.get("dataset")
     main_csv_path = settings.BASE_DIR / "ml" / "Phishing_Email.csv"
+    mode = "retrain" if not dataset_file else "append"
 
     try:
         import pandas as pd
@@ -67,23 +68,33 @@ def admin_train_model(request):
             # 1. Load uploaded data
             new_df = pd.read_csv(dataset_file)
             
-            # Basic validation of columns
-            required_cols = ["Email Text", "Email Type"]
-            if not all(col in new_df.columns for col in required_cols):
+            # Robust column detection (fuzzy mapping)
+            TEXT_COLS = ["Email Text", "text", "body", "content", "message"]
+            TYPE_COLS = ["Email Type", "label", "class", "target", "category", "type"]
+            
+            found_text = next((c for c in new_df.columns if c.lower() in [tc.lower() for tf in TEXT_COLS for tc in [tf]]), None)
+            found_type = next((c for c in new_df.columns if c.lower() in [tc.lower() for tf in TYPE_COLS for tc in [tf]]), None)
+
+            if not found_text or not found_type:
                 return JsonResponse({
                     'ok': False, 
-                    'error': f"Colonnes manquantes. Requis: {required_cols}"
+                    'error': f"Colonnes non détectées. Requis: un champ texte et une étiquette. Colonnes vues: {list(new_df.columns)}"
                 }, status=400)
+
+            # Standardize columns
+            new_df = new_df[[found_text, found_type]].rename(columns={
+                found_text: "Email Text",
+                found_type: "Email Type"
+            })
 
             # 2. Append to existing master dataset
             if main_csv_path.exists():
                 main_df = pd.read_csv(main_csv_path)
-                # Keep only relevant columns and drop duplicates
-                combined_df = pd.concat([main_df, new_df[required_cols]]).drop_duplicates()
+                combined_df = pd.concat([main_df, new_df]).drop_duplicates()
                 combined_df.to_csv(main_csv_path, index=False)
                 logger.info(f"Appended rows to {main_csv_path}")
             else:
-                new_df[required_cols].to_csv(main_csv_path, index=False)
+                new_df.to_csv(main_csv_path, index=False)
 
         # 3. Run training script
         cmd = [
@@ -100,10 +111,8 @@ def admin_train_model(request):
         global _model_bundle
         _model_bundle = None
         
-        return JsonResponse({
-            'ok': True, 
-            'message': 'Modèle entraîné et mis à jour avec succès.'
-        })
+        msg = "Modèle re-entraîné avec succès." if mode == "retrain" else "Nouvelles données ajoutées et modèle mis à jour."
+        return JsonResponse({'ok': True, 'message': msg})
 
     except Exception as e:
         logger.error(f"Failed to train model via admin panel: {e}")
