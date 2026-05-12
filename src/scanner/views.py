@@ -54,53 +54,42 @@ def admin_user_list(request):
 
 @login_required
 @user_passes_test(lambda u: u.is_staff)
-def export_reports_csv(request):
-    """Export all scan reports to a CSV file."""
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="scan_reports.csv"'
-
-    writer = csv.writer(response)
-    writer.writerow(['ID', 'Created At', 'User', 'Risk Score', 'Score', 'URLs Count'])
-
-    reports = ScanReport.objects.select_related('user').all().order_by('-created_at')
-    for r in reports:
-        writer.writerow([
-            r.id,
-            r.created_at.strftime('%Y-%m-%d %H:%M'),
-            r.user.username if r.user else 'Anonymous',
-            r.risk_score,
-            r.score,
-            len(r.suspicious_urls)
-        ])
-
-    return response
-
-
-@login_required
-@user_passes_test(lambda u: u.is_staff)
 @require_POST
 def admin_train_model(request):
-    """Trigger ML model training with optional dataset upload."""
+    """Append new data to dataset and trigger ML model training."""
     dataset_file = request.FILES.get("dataset")
-    temp_path = None
+    main_csv_path = settings.BASE_DIR / "ml" / "Phishing_Email.csv"
 
     try:
-        data_path = str(settings.BASE_DIR / "ml" / "Phishing_Email.csv")
-
+        import pandas as pd
+        
         if dataset_file:
-            # Save uploaded CSV to a temporary file
-            ext = os.path.splitext(dataset_file.name)[1]
-            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
-                for chunk in dataset_file.chunks():
-                    tmp.write(chunk)
-                temp_path = tmp.name
-            data_path = temp_path
+            # 1. Load uploaded data
+            new_df = pd.read_csv(dataset_file)
+            
+            # Basic validation of columns
+            required_cols = ["Email Text", "Email Type"]
+            if not all(col in new_df.columns for col in required_cols):
+                return JsonResponse({
+                    'ok': False, 
+                    'error': f"Colonnes manquantes. Requis: {required_cols}"
+                }, status=400)
 
-        # Run training script
+            # 2. Append to existing master dataset
+            if main_csv_path.exists():
+                main_df = pd.read_csv(main_csv_path)
+                # Keep only relevant columns and drop duplicates
+                combined_df = pd.concat([main_df, new_df[required_cols]]).drop_duplicates()
+                combined_df.to_csv(main_csv_path, index=False)
+                logger.info(f"Appended rows to {main_csv_path}")
+            else:
+                new_df[required_cols].to_csv(main_csv_path, index=False)
+
+        # 3. Run training script
         cmd = [
             sys.executable,
             str(settings.BASE_DIR / "ml" / "train.py"),
-            "--data", data_path,
+            "--data", str(main_csv_path),
             "--out", str(settings.BASE_DIR / "ml" / "model.joblib")
         ]
         
@@ -111,16 +100,14 @@ def admin_train_model(request):
         global _model_bundle
         _model_bundle = None
         
-        return JsonResponse({'ok': True, 'message': 'Modèle entraîné avec succès.'})
+        return JsonResponse({
+            'ok': True, 
+            'message': 'Modèle entraîné et mis à jour avec succès.'
+        })
 
     except Exception as e:
         logger.error(f"Failed to train model via admin panel: {e}")
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
-    
-    finally:
-        # Cleanup temp file
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
