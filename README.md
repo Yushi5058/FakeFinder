@@ -18,7 +18,8 @@ A Django-based email scanner that analyzes `.eml` files to detect phishing and f
 
 ```
 FakeFinder/
-├── FakeFinder/          # Django project settings
+├── src/                 # Django project root (manage.py)
+│   ├── FakeFinder/      # Django project settings
 │   ├── scanner/         # Main app: models, views, utils
 │   │   ├── models.py    # ScanReport model
 │   │   ├── views.py     # Upload, report, auth views
@@ -41,7 +42,7 @@ FakeFinder/
 ```bash
 # Clone the repository
 git clone https://codeberg.org/yushi_61/FakeFinder.git
-cd FakeFinder/FakeFinder
+cd FakeFinder/src
 
 # Create and activate virtual environment
 python -m venv venv
