@@ -214,9 +214,12 @@ def upload_email(request):
     return render(request, "scanner/upload.html", context)
 
 
-@login_required
 def report_detail(request, report_id):
-    report = get_object_or_404(ScanReport, id=report_id, user=request.user)
+    report = get_object_or_404(ScanReport, id=report_id)
+    # Reports owned by a user are private — only the owner may view them.
+    # Anonymous reports (user=None) remain accessible via direct link.
+    if report.user is not None and report.user != request.user:
+        return HttpResponseForbidden("Accès non autorisé.")
     return render(request, "scanner/report.html", {"report": report})
 
 
