@@ -350,17 +350,21 @@
         const timer = setInterval(() => {
             currentSecond++;
             let remaining = total - currentSecond;
-            if (remaining >= 0) {
+            
+            // UI Progress bar moves up to 98%
+            const progress = (1 - Math.pow(0.82, currentSecond)) * 98; 
+            progressBar.style.width = progress + "%";
+
+            if (remaining > 0) {
                 timerText.textContent = `~${remaining}s restantes`;
-                // Logarithmic-ish progress: fast start, slow end to avoid 100% too early
-                const progress = (1 - Math.pow(0.85, currentSecond)) * 95; 
-                progressBar.style.width = progress + "%";
+            } else {
+                timerText.textContent = "Finalisation...";
             }
             
             if (currentSecond === 2) statusText.textContent = "Extraction des caractéristiques textuelles...";
             if (currentSecond === 5) statusText.textContent = "Optimisation du modèle (Random Forest)...";
             if (currentSecond === 8) statusText.textContent = "Calibration des probabilités...";
-            if (remaining <= 2 && remaining > 0) statusText.textContent = "Finalisation de la sauvegarde...";
+            if (remaining <= 0) statusText.textContent = "Le serveur finalise les fichiers du modèle...";
         }, 1000);
 
         const formData = new FormData(trainForm);
