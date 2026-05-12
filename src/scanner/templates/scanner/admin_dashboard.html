@@ -1,97 +1,221 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="fr" class="scroll-smooth">
 <head>
-    <title>Admin Dashboard - FakeFinder</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; background: #f4f4f9; }
-        .stats { display: flex; gap: 2em; margin-bottom: 2em; }
-        .stat-card { background: white; padding: 1.5em; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); flex: 1; text-align: center; }
-        .stat-card h3 { margin-top: 0; color: #555; }
-        .stat-card p { font-size: 2em; font-weight: bold; margin: 0; color: #333; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #333; color: white; }
-        tr:hover { background: #f9f9f9; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
-        .badge-HIGH { background: #ffebee; color: #c62828; }
-        .badge-MEDIUM { background: #fff3e0; color: #ef6c00; }
-        .badge-LOW { background: #e8f5e9; color: #2e7d32; }
-        .actions { margin-bottom: 1em; display: flex; gap: 10px; }
-        .btn { padding: 8px 16px; border-radius: 4px; text-decoration: none; color: white; background: #007bff; font-weight: bold; cursor: pointer; border: none; }
-        .btn-success { background: #28a745; }
-        .btn-danger { background: #dc3545; }
-        .nav { margin-bottom: 1em; }
-        .nav a { margin-right: 15px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - FakeFinder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink:  { 950:'#070b1a', 900:'#0b1126', 800:'#111a36', 700:'#1a2547', 600:'#243160' },
+            brand:   { 400:'#7aa2ff', 500:'#4f7cff', 600:'#3a5fe0' },
+            verdict: { safe:'#22c55e', warn:'#f59e0b', danger:'#ef4444' },
+          },
+          fontFamily: {
+            sans: ['Inter','system-ui','sans-serif'],
+            mono: ['JetBrains Mono','ui-monospace','monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background-color: #070b1a;
+      background-image:
+        radial-gradient(ellipse at 18% -8%,  rgba(79,124,255,.20), transparent 52%),
+        radial-gradient(ellipse at 82% 108%, rgba(36,49,96,.38),   transparent 52%);
+      background-attachment: fixed;
+    }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(122,162,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(122,162,255,.045) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .gradient-text {
+      background: linear-gradient(125deg, #7aa2ff 0%, #4f7cff 45%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    @keyframes softPulse {
+      0%,100% { opacity:.45; transform:scale(1);    }
+      50%      { opacity:0;   transform:scale(1.18); }
+    }
+    .anim-ring { animation: softPulse 2.8s ease-in-out infinite; }
+    .badge { display:inline-flex; align-items:center; gap:5px; border-radius:9999px; padding:2px 9px; font-size:11px; font-weight:700; letter-spacing:.03em; }
+    .badge-SAFE { background:rgba(34,197,94,.15);  color:#22c55e; }
+    .badge-LOW { background:rgba(34,197,94,.15);  color:#22c55e; }
+    .badge-MEDIUM { background:rgba(245,158,11,.15); color:#f59e0b; }
+    .badge-HIGH { background:rgba(239,68,68,.15);  color:#ef4444; }
+    .nav-btn { color:rgb(148,163,184); transition:color .15s, background .15s; }
+    .nav-btn:hover { color:#fff; background:rgba(255,255,255,.06); }
+    .nav-btn.active { color:#fff; }
+  </style>
 </head>
-<body>
-    <div class="nav">
-        <a href="{% url 'upload_email' %}">Upload</a>
-        <a href="{% url 'admin_dashboard' %}"><b>Dashboard</b></a>
-        <a href="{% url 'admin_user_list' %}">Users</a>
-        <a href="{% url 'logout' %}">Logout</a>
+
+<body class="font-sans text-slate-100 antialiased min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-50 border-b border-white/5 bg-[#070b1a]/88 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+    <a href="{% url 'upload_email' %}" class="flex items-center gap-2.5 group focus:outline-none">
+      <div class="relative">
+        <div class="absolute inset-0 rounded-xl bg-brand-500/25 anim-ring"></div>
+        <span class="relative flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500/15 ring-1 ring-brand-500/30">
+          <svg class="h-5 w-5 text-brand-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+        </span>
+      </div>
+      <div class="leading-none text-left">
+        <div class="text-[13px] font-bold tracking-tight">Fake Finder</div>
+        <div class="text-[9px] uppercase tracking-[.26em] text-slate-500">phishing detector</div>
+      </div>
+    </a>
+    <nav class="hidden md:flex items-center gap-0.5">
+      <a href="{% url 'upload_email' %}" class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Analyser</a>
+      <a href="{% url 'admin_dashboard' %}" class="nav-btn active rounded-lg px-3.5 py-2 text-[13px]"><b>Dashboard</b></a>
+      <a href="{% url 'admin_user_list' %}" class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Utilisateurs</a>
+    </nav>
+    <div class="flex items-center gap-2">
+      <span class="hidden md:inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-[12px] text-slate-300">
+        <span class="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse"></span>
+        <span>{{ user.username }}</span>
+      </span>
+      <form action="{% url 'logout' %}" method="post" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="rounded-lg px-3 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Déconnexion</button>
+      </form>
     </div>
+  </div>
+</header>
 
-    <h1>Admin Dashboard</h1>
-
-    <div class="stats">
-        <div class="stat-card">
-            <h3>Total Scans</h3>
-            <p>{{ stats.total_scans }}</p>
-        </div>
-        <div class="stat-card">
-            <h3>Phishing Detected</h3>
-            <p>{{ stats.phishing_detected }}</p>
-        </div>
-        <div class="stat-card">
-            <h3>Registered Users</h3>
-            <p>{{ stats.users_count }}</p>
-        </div>
-    </div>
-
-    <div class="actions">
-        <a href="{% url 'export_reports_csv' %}" class="btn">Export CSV</a>
-        <form method="POST" action="{% url 'admin_train_model' %}" style="display:inline;">
+<main class="flex-1 mx-auto w-full max-w-6xl px-6 py-10">
+  <div class="flex items-center justify-between mb-8">
+    <h1 class="text-3xl font-extrabold tracking-tight">Espace <span class="gradient-text">Administrateur</span></h1>
+    <div class="flex gap-2">
+        <a href="{% url 'export_reports_csv' %}" class="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-xs font-bold text-slate-300 hover:bg-white/10 transition-colors">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exporter CSV
+        </a>
+        <form id="train-form" method="POST" action="{% url 'admin_train_model' %}">
             {% csrf_token %}
-            <button type="submit" class="btn btn-success">Train Model Now</button>
+            <button type="submit" id="train-btn" class="flex items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600 transition-colors">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v8"/><path d="m16 6-4 4-4-4"/><rect width="20" height="8" x="2" y="14" rx="2"/></svg>
+              Entraîner le modèle
+            </button>
         </form>
     </div>
+  </div>
 
-    <h2>Recent Scans</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>User</th>
-                <th>Score</th>
-                <th>Risk</th>
-                <th>Actions</th>
-            </tr>
+  <div id="train-msg" class="hidden mb-6 p-4 rounded-xl text-sm font-medium"></div>
+
+  <!-- Stats -->
+  <div class="grid gap-4 sm:grid-cols-3 mb-10">
+    <div class="rounded-2xl border border-white/10 bg-ink-900/60 p-6 shadow-xl shadow-black/20">
+      <p class="text-[11px] uppercase tracking-wider text-slate-500 font-bold mb-2">Analyses totales</p>
+      <div class="flex items-baseline gap-2">
+        <p class="text-4xl font-extrabold text-slate-100">{{ stats.total_scans }}</p>
+      </div>
+    </div>
+    <div class="rounded-2xl border border-verdict-danger/20 bg-verdict-danger/10 p-6 shadow-xl shadow-black/20">
+      <p class="text-[11px] uppercase tracking-wider text-verdict-danger font-bold mb-2">Phishing détecté</p>
+      <div class="flex items-baseline gap-2">
+        <p class="text-4xl font-extrabold text-verdict-danger">{{ stats.phishing_detected }}</p>
+      </div>
+    </div>
+    <div class="rounded-2xl border border-brand-500/20 bg-brand-500/10 p-6 shadow-xl shadow-black/20">
+      <p class="text-[11px] uppercase tracking-wider text-brand-400 font-bold mb-2">Utilisateurs</p>
+      <div class="flex items-baseline gap-2">
+        <p class="text-4xl font-extrabold text-brand-400">{{ stats.users_count }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-4">
+    <h2 class="text-xl font-bold tracking-tight">Analyses récentes</h2>
+    <div class="overflow-hidden rounded-2xl border border-white/10 bg-ink-900/60 shadow-xl">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
+          <tr>
+            <th class="px-6 py-4">Fichier</th>
+            <th class="px-6 py-4">Utilisateur</th>
+            <th class="px-6 py-4">Score</th>
+            <th class="px-6 py-4">Verdict</th>
+            <th class="px-6 py-4">Date</th>
+            <th class="px-6 py-4 text-right">Actions</th>
+          </tr>
         </thead>
-        <tbody>
-            {% for report in reports %}
-            <tr>
-                <td>{{ report.id }}</td>
-                <td>{{ report.created_at|date:"Y-m-d H:i" }}</td>
-                <td>{{ report.user.username|default:"Anonymous" }}</td>
-                <td>{{ report.score }}/100</td>
-                <td><span class="badge badge-{{ report.risk_score }}">{{ report.risk_score }}</span></td>
-                <td>
-                    <a href="{% url 'report_detail' report.id %}">View</a> |
-                    <form method="POST" action="{% url 'admin_delete_report' report.id %}" style="display:inline;" onsubmit="return confirm('Delete this report?');">
-                        {% csrf_token %}
-                        <button type="submit" style="background:none; border:none; color:#dc3545; cursor:pointer; padding:0; font:inherit;">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="6" style="text-align:center;">No reports found.</td>
-            </tr>
-            {% endfor %}
+        <tbody class="divide-y divide-white/5">
+          {% for report in reports %}
+          <tr class="hover:bg-white/5 transition-colors">
+            <td class="px-6 py-4 font-mono text-xs text-slate-300">report_{{ report.id }}.eml</td>
+            <td class="px-6 py-4 text-slate-400">{{ report.user.username|default:"Anonyme" }}</td>
+            <td class="px-6 py-4 font-bold text-slate-200">{{ report.score }}/100</td>
+            <td class="px-6 py-4">
+              <span class="badge badge-{{ report.risk_score }}">{{ report.risk_score }}</span>
+            </td>
+            <td class="px-6 py-4 text-xs text-slate-500">{{ report.created_at|date:"d M Y H:i" }}</td>
+            <td class="px-6 py-4 text-right">
+              <div class="flex items-center justify-end gap-3">
+                <a href="{% url 'report_detail' report.id %}" class="text-xs text-brand-400 hover:text-brand-300 font-bold transition-colors">Voir</a>
+                <form method="POST" action="{% url 'admin_delete_report' report.id %}" onsubmit="return confirm('Supprimer ce rapport ?');" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="text-xs text-slate-600 hover:text-verdict-danger transition-colors" title="Supprimer">
+                      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-6 py-12 text-center text-slate-500">Aucune analyse enregistrée.</td></tr>
+          {% endfor %}
         </tbody>
-    </table>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+    const trainForm = document.getElementById('train-form');
+    const trainBtn  = document.getElementById('train-btn');
+    const trainMsg  = document.getElementById('train-msg');
+
+    trainForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        trainBtn.disabled = true;
+        trainBtn.innerHTML = "Entraînement...";
+        trainMsg.classList.add('hidden');
+
+        try {
+            const resp = await fetch("{% url 'admin_train_model' %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            const data = await resp.json();
+            if (data.ok) {
+                trainMsg.textContent = data.message;
+                trainMsg.className = "mb-6 p-4 rounded-xl text-sm font-medium bg-verdict-safe/10 text-verdict-safe border border-verdict-safe/20";
+            } else {
+                trainMsg.textContent = "Erreur: " + data.error;
+                trainMsg.className = "mb-6 p-4 rounded-xl text-sm font-medium bg-verdict-danger/10 text-verdict-danger border border-verdict-danger/20";
+            }
+        } catch (err) {
+            trainMsg.textContent = "Erreur réseau.";
+            trainMsg.className = "mb-6 p-4 rounded-xl text-sm font-medium bg-verdict-danger/10 text-verdict-danger border border-verdict-danger/20";
+        } finally {
+            trainBtn.disabled = false;
+            trainBtn.innerHTML = "Entraîner le modèle";
+            trainMsg.classList.remove('hidden');
+        }
+    });
+</script>
+
 </body>
 </html>

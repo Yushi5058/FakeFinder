@@ -1,49 +1,117 @@
-
 <!DOCTYPE html>
-<html>
+<html lang="fr" class="scroll-smooth">
 <head>
-    <title>Users List - FakeFinder</title>
-    <style>
-        body { font-family: sans-serif; margin: 2em; background: #f4f4f9; }
-        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        th { background: #333; color: white; }
-        tr:hover { background: #f9f9f9; }
-        .nav { margin-bottom: 1em; }
-        .nav a { margin-right: 15px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Users List - FakeFinder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            ink:  { 950:'#070b1a', 900:'#0b1126', 800:'#111a36', 700:'#1a2547', 600:'#243160' },
+            brand:   { 400:'#7aa2ff', 500:'#4f7cff', 600:'#3a5fe0' },
+            verdict: { safe:'#22c55e', warn:'#f59e0b', danger:'#ef4444' },
+          },
+          fontFamily: {
+            sans: ['Inter','system-ui','sans-serif'],
+            mono: ['JetBrains Mono','ui-monospace','monospace'],
+          },
+        },
+      },
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background-color: #070b1a;
+      background-image:
+        radial-gradient(ellipse at 18% -8%,  rgba(79,124,255,.20), transparent 52%),
+        radial-gradient(ellipse at 82% 108%, rgba(36,49,96,.38),   transparent 52%);
+      background-attachment: fixed;
+    }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(122,162,255,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(122,162,255,.045) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .gradient-text {
+      background: linear-gradient(125deg, #7aa2ff 0%, #4f7cff 45%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .nav-btn { color:rgb(148,163,184); transition:color .15s, background .15s; }
+    .nav-btn:hover { color:#fff; background:rgba(255,255,255,.06); }
+    .nav-btn.active { color:#fff; }
+  </style>
 </head>
-<body>
-    <div class="nav">
-        <a href="{% url 'upload_email' %}">Upload</a>
-        <a href="{% url 'admin_dashboard' %}">Dashboard</a>
-        <a href="{% url 'admin_user_list' %}"><b>Users</b></a>
-        <a href="{% url 'logout' %}">Logout</a>
+
+<body class="font-sans text-slate-100 antialiased min-h-screen flex flex-col">
+
+<header class="sticky top-0 z-50 border-b border-white/5 bg-[#070b1a]/88 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+    <a href="{% url 'upload_email' %}" class="flex items-center gap-2.5 group focus:outline-none">
+      <div class="leading-none text-left">
+        <div class="text-[13px] font-bold tracking-tight">Fake Finder</div>
+        <div class="text-[9px] uppercase tracking-[.26em] text-slate-500">phishing detector</div>
+      </div>
+    </a>
+    <nav class="hidden md:flex items-center gap-0.5">
+      <a href="{% url 'upload_email' %}" class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Analyser</a>
+      <a href="{% url 'admin_dashboard' %}" class="nav-btn rounded-lg px-3.5 py-2 text-[13px]">Dashboard</a>
+      <a href="{% url 'admin_user_list' %}" class="nav-btn active rounded-lg px-3.5 py-2 text-[13px]"><b>Utilisateurs</b></a>
+    </nav>
+    <div class="flex items-center gap-2">
+      <form action="{% url 'logout' %}" method="post" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="rounded-lg px-3 py-2 text-[13px] text-slate-400 hover:text-white transition-colors">Déconnexion</button>
+      </form>
     </div>
+  </div>
+</header>
 
-    <h1>Registered Users</h1>
+<main class="flex-1 mx-auto w-full max-w-6xl px-6 py-10">
+  <h1 class="text-3xl font-extrabold tracking-tight mb-8">Utilisateurs <span class="gradient-text">Inscrits</span></h1>
 
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Username</th>
-                <th>Email</th>
-                <th>Joined Date</th>
-                <th>Staff Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for user in users %}
-            <tr>
-                <td>{{ user.id }}</td>
-                <td>{{ user.username }}</td>
-                <td>{{ user.email }}</td>
-                <td>{{ user.date_joined|date:"Y-m-d H:i" }}</td>
-                <td>{% if user.is_staff %}✅ Staff{% else %}User{% endif %}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
+  <div class="overflow-hidden rounded-2xl border border-white/10 bg-ink-900/60 shadow-xl">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-white/5 text-[11px] uppercase tracking-wider text-slate-500">
+        <tr>
+          <th class="px-6 py-4">ID</th>
+          <th class="px-6 py-4">Nom d'utilisateur</th>
+          <th class="px-6 py-4">Email</th>
+          <th class="px-6 py-4">Date d'inscription</th>
+          <th class="px-6 py-4">Statut</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5">
+        {% for user in users %}
+        <tr class="hover:bg-white/5 transition-colors">
+          <td class="px-6 py-4 text-slate-500 font-mono text-xs">{{ user.id }}</td>
+          <td class="px-6 py-4 font-bold text-slate-200">{{ user.username }}</td>
+          <td class="px-6 py-4 text-slate-400">{{ user.email|default:"—" }}</td>
+          <td class="px-6 py-4 text-xs text-slate-500">{{ user.date_joined|date:"d M Y H:i" }}</td>
+          <td class="px-6 py-4">
+            {% if user.is_staff %}
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-2.5 py-0.5 text-xs font-bold text-brand-400">
+              <span class="h-1.5 w-1.5 rounded-full bg-brand-400"></span>
+              Staff
+            </span>
+            {% else %}
+            <span class="text-slate-500 text-xs">Utilisateur</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table>
+  </div>
+</main>
+
 </body>
 </html>
