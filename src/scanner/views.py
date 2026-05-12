@@ -7,8 +7,43 @@ from pathlib import Path
 import joblib
 from django.conf import settings
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
+...
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def admin_dashboard(request):
+    """Admin-only view to see global scan stats and latest reports."""
+    all_reports = ScanReport.objects.select_related('user').all().order_by('-created_at')
+    
+    stats = {
+        'total_scans': all_reports.count(),
+        'phishing_detected': all_reports.filter(risk_score='HIGH').count(),
+        'users_count': User.objects.count(),
+    }
+    
+    return render(request, "scanner/admin_dashboard.html", {
+        "reports": all_reports[:100],
+        "stats": stats
+    })
+
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+@require_POST
+def admin_delete_report(request, report_id):
+    """Admin-only view to delete any scan report."""
+    report = get_object_or_404(ScanReport, id=report_id)
+    report.delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@user_passes_test(lambda u: u.is_staff)
+def admin_user_list(request):
+    """Admin-only view to see list of registered users."""
+    users = User.objects.all().order_by('-date_joined')
+    return render(request, "scanner/admin_users.html", {"users": users})
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
