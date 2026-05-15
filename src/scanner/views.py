@@ -151,12 +151,20 @@ def _get_model():
 # ── Trusted sender roots ─────────────────────────────────────────────────────
 # We fetch these from the database to allow dynamic updates.
 def _get_trusted_domains():
-    """Fetch trusted domains from the database, cached for performance."""
+    """Fetch trusted domains from the database, cached for performance. Falls back to DB on Redis error."""
     cache_key = 'trusted_domains_list'
-    trusted = cache.get(cache_key)
+    try:
+        trusted = cache.get(cache_key)
+    except Exception as e:
+        logger.warning(f"Cache access failed (Redis down?): {e}")
+        trusted = None
+
     if trusted is None:
         trusted = frozenset(TrustedDomain.objects.values_list('domain', flat=True))
-        cache.set(cache_key, trusted, 3600)  # Cache for 1 hour
+        try:
+            cache.set(cache_key, trusted, 3600)  # Cache for 1 hour
+        except Exception as e:
+            logger.debug(f"Failed to set cache: {e}")
     return trusted
 
 
@@ -342,7 +350,13 @@ def delete_all_reports(request):
 def login_view(request):
     ip        = request.META.get('REMOTE_ADDR', 'unknown')
     cache_key = f'login_attempts_{ip}'
-    attempts  = cache.get(cache_key, 0)
+    
+    try:
+        attempts = cache.get(cache_key, 0)
+    except Exception as e:
+        logger.warning(f"Rate limiter cache access failed: {e}")
+        attempts = 0
+
     if attempts >= 10:
         return JsonResponse(
             {'ok': False, 'error': 'Trop de tentatives. Réessayez dans 5 minutes.'},
@@ -358,11 +372,17 @@ def login_view(request):
     password = data.get('password', '')
     user = authenticate(request, username=username, password=password)
     if user:
-        cache.delete(cache_key)
+        try:
+            cache.delete(cache_key)
+        except Exception:
+            pass
         login(request, user)
         return JsonResponse({'ok': True, 'username': user.username, 'is_staff': user.is_staff})
 
-    cache.set(cache_key, attempts + 1, 300)  # 5-minute window
+    try:
+        cache.set(cache_key, attempts + 1, 300)  # 5-minute window
+    except Exception:
+        pass
     return JsonResponse({'ok': False, 'error': 'Identifiant ou mot de passe incorrect.'}, status=400)
 
 
