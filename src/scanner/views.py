@@ -124,43 +124,20 @@ from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbid
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .models import ScanReport
-from .utils import parse_eml_in_memory
+import hashlib
+from django.db import models
+from .models import ScanReport, Signature, TrustedDomain
 
-logger = logging.getLogger(__name__)
-
-# ── ML model — loaded once on first use ──────────────────────────────────────
-
-_model_bundle = None
-MODEL_PATH = Path(settings.BASE_DIR) / "ml" / "model.joblib"
-
-
-def _get_model():
-    """Load the model bundle from disk the first time it is needed."""
-    global _model_bundle
-    if _model_bundle is None and MODEL_PATH.exists():
-        try:
-            _model_bundle = joblib.load(MODEL_PATH)
-        except Exception as e:
-            logger.error(f"Failed to load ML model from {MODEL_PATH}: {e}")
-    return _model_bundle
-
-
-# ── Trusted sender roots (root domain only, e.g. "github.com") ───────────────
-# Used to correct ML over-detection on legitimate transactional/notification email.
-_SAFE_SENDER_ROOTS: frozenset[str] = frozenset({
-    "github.com", "githubusercontent.com", "gitlab.com", "bitbucket.org",
-    "google.com", "gmail.com", "googlemail.com", "googlegroups.com",
-    "microsoft.com", "outlook.com", "live.com", "hotmail.com", "office.com",
-    "apple.com", "icloud.com",
-    "amazon.com", "amazonaws.com",
-    "linkedin.com", "twitter.com", "x.com",
-    "slack.com", "dropbox.com", "zoom.us", "notion.so",
-    "vercel.com", "netlify.com", "heroku.com", "cloudflare.com",
-    "stackoverflow.com", "npmjs.com", "pypi.org",
-    "atlassian.com", "jira.com", "confluence.com",
-    "google.co.uk", "amazon.co.uk", "amazon.de", "google.fr",
-})
+# ── Trusted sender roots ─────────────────────────────────────────────────────
+# We fetch these from the database to allow dynamic updates.
+def _get_trusted_domains():
+    """Fetch trusted domains from the database, cached for performance."""
+    cache_key = 'trusted_domains_list'
+    trusted = cache.get(cache_key)
+    if trusted is None:
+        trusted = frozenset(TrustedDomain.objects.values_list('domain', flat=True))
+        cache.set(cache_key, trusted, 3600)  # Cache for 1 hour
+    return trusted
 
 
 def _root_domain(domain: str) -> str:
@@ -176,25 +153,20 @@ def _root_domain(domain: str) -> str:
         if parts[-2] in ("co", "com", "net", "org", "edu", "gov") and len(parts[-1]) == 2:
             return ".".join(parts[-3:])
     return ".".join(parts[-2:]) if len(parts) >= 2 else domain
-
-
 def _adjust_proba(proba: float, parsed_data: dict) -> float:
     """
     Apply lightweight rule-based corrections on top of the raw ML probability.
 
     - Trusted sender domain  → large downward correction
     - All URLs from trusted domains → additional downward correction
-
-    This compensates for training/inference distribution mismatch: the model was
-    trained on body-only text while legitimate transactional emails (GitHub, etc.)
-    contain many links and account-related words that superficially resemble phishing.
     """
     sender_domain = parsed_data.get("sender_domain", "")
     urls          = parsed_data.get("urls", [])
+    trusted_roots = _get_trusted_domains()
 
     if sender_domain:
         root = _root_domain(sender_domain)
-        if root in _SAFE_SENDER_ROOTS:
+        if root in trusted_roots:
             proba = max(0.0, proba - 0.45)
 
     if urls:
@@ -205,7 +177,7 @@ def _adjust_proba(proba: float, parsed_data: dict) -> float:
                 for u in urls if u
             }
             url_roots.discard("")
-            if url_roots and url_roots.issubset(_SAFE_SENDER_ROOTS):
+            if url_roots and url_roots.issubset(trusted_roots):
                 proba = max(0.0, proba - 0.20)
         except Exception as e:
             logger.debug(f"Error during URL domain analysis: {e}")
@@ -213,13 +185,49 @@ def _adjust_proba(proba: float, parsed_data: dict) -> float:
     return max(0.0, min(1.0, proba))
 
 
+def _check_signatures(parsed_data: dict) -> tuple:
+    """
+    Check URLs and email content hashes against known phishing signatures.
+    Returns (risk_score, score) if a match is found, otherwise None.
+    """
+    # 1. Check URLs
+    urls = parsed_data.get("urls", [])
+    if urls:
+        # Use SHA256 for URL hashes
+        url_hashes = [hashlib.sha256(u.encode('utf-8')).hexdigest() for u in urls]
+        if Signature.objects.filter(indicator_type='URL', indicator_hash__in=url_hashes).exists():
+            logger.info("Phishing signature match: URL detected in database.")
+            return "HIGH", 100
+
+    # 2. Check Body Content Hash (MD5/SHA256)
+    body = (parsed_data.get("body_text", "") or "").encode('utf-8')
+    if body:
+        md5_hash = hashlib.md5(body).hexdigest()
+        sha256_hash = hashlib.sha256(body).hexdigest()
+
+        if Signature.objects.filter(
+            models.Q(indicator_type='MD5', indicator_hash=md5_hash) |
+            models.Q(indicator_type='SHA256', indicator_hash=sha256_hash)
+        ).exists():
+            logger.info("Phishing signature match: Email content hash detected in database.")
+            return "HIGH", 100
+
+    return None
+
+
 def _predict(parsed_data: dict) -> tuple:
     """
-    Run the ML model on the parsed email data.
+    Run the ML model on the parsed email data, preceded by a signature lookup.
 
     Returns (risk_score: str, score: int).
     Falls back to 'MEDIUM' / 50 if the model is not yet trained.
     """
+    # 1. First check signatures (fast path)
+    sig_result = _check_signatures(parsed_data)
+    if sig_result:
+        return sig_result
+
+    # 2. ML Path
     bundle = _get_model()
     if bundle is None:
         logger.warning("ML model bundle not found. Using fallback prediction.")

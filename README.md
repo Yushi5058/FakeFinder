@@ -5,14 +5,16 @@ A Django-based email scanner that analyzes `.eml` files to detect phishing and f
 ## Features
 
 - Upload and scan `.eml` email files via a web interface
-- ML-powered phishing detection (Random Forest with TF-IDF + structural features)
+- **Hybrid detection pipeline**:
+  - **Signature matching**: Instant lookup of known phishing URL and content hashes (MD5/SHA256).
+  - **Dynamic Trusted Domains**: Rule-based score reduction for legitimate services (GitHub, Codeberg, Google, etc.), manageable via the admin panel.
+  - **ML-powered analysis**: Random Forest with TF-IDF + structural features for unknown threats, including enhanced detection for crypto-related phishing.
 - Risk scoring: `LOW` (safe), `MEDIUM` (review), `HIGH` (phishing)
 - Suspicious URL extraction with sanitization
 - Sender domain analysis and header anomaly detection
 - User authentication (register/login/logout)
 - Scan history and report management per user
 - Rate-limiting on login attempts
-- Security hardening in production (HSTS, secure cookies, CSRF protection)
 
 ## Architecture
 
@@ -21,8 +23,8 @@ FakeFinder/
 ├── src/                 # Django project root (manage.py)
 │   ├── FakeFinder/      # Django project settings
 │   ├── scanner/         # Main app: models, views, utils
-│   │   ├── models.py    # ScanReport model
-│   │   ├── views.py     # Upload, report, auth views
+│   │   ├── models.py    # ScanReport & Signature models
+│   │   ├── views.py     # Hybrid prediction logic (Signature + ML)
 │   │   ├── utils.py     # .eml parsing and URL extraction
 │   │   └── urls.py      # URL routing
 │   └── ml/              # Machine learning module
