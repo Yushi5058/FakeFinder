@@ -129,6 +129,25 @@ from django.db import models
 from .models import ScanReport, Signature, TrustedDomain
 from .utils import parse_eml_in_memory
 
+logger = logging.getLogger(__name__)
+
+# ── ML model — loaded once on first use ──────────────────────────────────────
+
+_model_bundle = None
+MODEL_PATH = Path(settings.BASE_DIR) / "ml" / "model.joblib"
+
+
+def _get_model():
+    """Load the model bundle from disk the first time it is needed."""
+    global _model_bundle
+    if _model_bundle is None and MODEL_PATH.exists():
+        try:
+            _model_bundle = joblib.load(MODEL_PATH)
+        except Exception as e:
+            logger.error(f"Failed to load ML model from {MODEL_PATH}: {e}")
+    return _model_bundle
+
+
 # ── Trusted sender roots ─────────────────────────────────────────────────────
 # We fetch these from the database to allow dynamic updates.
 def _get_trusted_domains():

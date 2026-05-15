@@ -1,7 +1,7 @@
 import hashlib
 from django.test import TestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
-from .models import Signature, ScanReport
+from .models import Signature, ScanReport, TrustedDomain
 from .views import _root_domain, _predict
 from .utils import parse_eml_in_memory
 
@@ -85,6 +85,9 @@ class SignatureTests(TestCase):
         self.assertEqual(score, 100)
 
     def test_no_signature_match(self):
+        # Add google.com as trusted for this test
+        TrustedDomain.objects.create(domain="google.com")
+        
         # This will fall back to ML
         parsed_data = {
             "urls": ["https://safe.com"],
