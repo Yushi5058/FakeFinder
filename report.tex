@@ -428,7 +428,7 @@ l'architecture de fakefinder repose sur une interaction fluide entre plusieurs c
             \textit{moteur d'inférence (ml model) :} charge le modèle \texttt{.joblib} et calcule la probabilité de phishing.
         \end{itemize}
     \item \textbf{couche de persistance (postgresql) :} stocke uniquement les métadonnées dépersonnalisées et les scores d'analyse, garantissant la politique de zero retention pour le contenu des e-mails.
-    \item \textbf{couche de performance (redis) :} fait office de moteur de cache distribué pour les domaines de confiance et les sessions, réduisant drastiquement les accès disque redondants.
+    \item \textbf{couche de performance (redis) :} fait office de moteur de cache distribué pour les domaines de confiance et les sessions, réduisant drastiquement les accès disque redondants. Un mécanisme de \textit{fallback} transparent a été implémenté pour garantir la continuité du service en cas d'indisponibilité du serveur Redis, basculant automatiquement sur des requêtes directes en base de données.
 \end{enumerate}
 
 ce flux assure que les données sensibles ne quittent jamais la mémoire vive du processus applicatif, minimisant ainsi la surface d'attaque et garantissant une confidentialité maximale.
