@@ -16,6 +16,29 @@ A Django-based email scanner that analyzes `.eml` files to detect phishing and f
 - Scan history and report management per user
 - Rate-limiting on login attempts
 
+## Admin Management
+
+The platform includes a secure administrative interface to manage the detection intelligence manually. Access it at `/admin/` (requires staff/superuser account).
+
+### Managing Trusted Domains
+To prevent false positives from legitimate services:
+1. Navigate to **Scanner > Trusted Domains**.
+2. Add the root domain (e.g., `codeberg.org`, `company-internal.com`).
+3. These domains receive a significant risk score reduction during analysis.
+4. Changes are applied instantly (cache is automatically invalidated).
+
+### Managing Phishing Signatures
+To enable instant blocking of known threats:
+1. Navigate to **Scanner > Signatures**.
+2. Add a new signature by providing:
+   - **Type**: `URL` (SHA256 of the URL string), `MD5`, or `SHA256` (of the email body).
+   - **Hash**: The cryptographic hash of the indicator.
+   - **Description**: Source or name of the phishing campaign.
+3. Matching signatures trigger an immediate `HIGH` risk rating (Score: 100).
+
+### Retraining the ML Model
+Admins can upload new datasets (CSV format) via the **Admin Dashboard** (`/admin-panel/`) to retrain the Random Forest model with the latest phishing trends.
+
 ## Architecture
 
 ```
