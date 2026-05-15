@@ -104,7 +104,7 @@ def admin_train_model(request):
             "--out", str(settings.BASE_DIR / "ml" / "model.joblib")
         ]
         
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)  # 10 minute timeout
         logger.info(f"Model trained successfully via admin panel: {result.stdout}")
         
         # Reset model bundle to force reload on next use

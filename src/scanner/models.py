@@ -1,5 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.core.cache import cache
 
 
 class ScanReport(models.Model):
@@ -63,3 +66,9 @@ class TrustedDomain(models.Model):
 
     def __str__(self):
         return self.domain
+
+
+@receiver([post_save, post_delete], sender=TrustedDomain)
+def invalidate_trusted_domains_cache(sender, **kwargs):
+    """Invalidate the trusted domains cache when the database changes."""
+    cache.delete('trusted_domains_list')
