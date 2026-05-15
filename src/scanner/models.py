@@ -71,4 +71,9 @@ class TrustedDomain(models.Model):
 @receiver([post_save, post_delete], sender=TrustedDomain)
 def invalidate_trusted_domains_cache(sender, **kwargs):
     """Invalidate the trusted domains cache when the database changes."""
-    cache.delete('trusted_domains_list')
+    try:
+        cache.delete('trusted_domains_list')
+    except Exception:
+        # If cache is down, we don't want to crash the DB transaction.
+        # The cache will either be empty or views will handle connection errors.
+        pass
