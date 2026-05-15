@@ -28,7 +28,8 @@ import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, roc_auc_score
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report, roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.model_selection import train_test_split
 
 # Make sure the project root is on sys.path so `ml.features` is importable
@@ -138,6 +139,16 @@ def train(csv_path: str, output_path: str, n_trees: int):
     print("\n-- Evaluation results -----------------------------------------")
     print(classification_report(y_test, y_pred, target_names=["Safe", "Phishing"]))
     print(f"ROC-AUC : {roc_auc_score(y_test, y_proba):.4f}")
+
+    # -- Confusion Matrix Plot ------------------------------------------------
+    cm = confusion_matrix(y_test, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Safe", "Phishing"])
+    disp.plot(cmap=plt.cm.Blues)
+    plt.title("Confusion Matrix: Phishing Email Detection")
+
+    cm_path = Path(output_path).parent / "confusion_matrix.png"
+    plt.savefig(cm_path)
+    print(f"Confusion matrix image saved → {cm_path.resolve()}")
     print("---------------------------------------------------------------\n")
 
     # ── Save model bundle ─────────────────────────────────────────────────────
