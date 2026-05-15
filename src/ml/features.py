@@ -27,6 +27,9 @@ PHISHING_KEYWORDS = [
     "24 hours", "48 hours", "act now", "validate",
     "unusual activity", "suspicious", "blocked", "restricted",
     "your account", "reset", "temporary", "reactivate",
+    "crypto", "wallet", "metamask", "ledger", "binance", "coinbase",
+    "ethereum", "bitcoin", "nft", "airdrop", "seed phrase", "private key",
+    "authorize", "connect wallet", "pancakeswap", "uniswap", "token",
 ]
 
 # Common URL shortener domains used in phishing
