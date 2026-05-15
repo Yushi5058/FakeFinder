@@ -127,6 +127,7 @@ from django.views.decorators.http import require_POST
 import hashlib
 from django.db import models
 from .models import ScanReport, Signature, TrustedDomain
+from .utils import parse_eml_in_memory
 
 # ── Trusted sender roots ─────────────────────────────────────────────────────
 # We fetch these from the database to allow dynamic updates.
